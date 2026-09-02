@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import type { Evenement } from '../types';
 import { Button } from '../components/ui/Button';
 import { ValidationBadge } from '../components/ValidationBadge';
+import { ImportExportEvenements } from '../components/ImportExportEvenements';
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MOIS = [
@@ -98,11 +99,14 @@ export default function Calendrier() {
             →
           </Button>
         </div>
-        {estAdministrateur && (
-          <Button variant="secondary" onClick={archiverPasses}>
-            Archiver les événements passés
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {estAdministrateur && (
+            <Button variant="secondary" onClick={archiverPasses}>
+              Archiver les événements passés
+            </Button>
+          )}
+          <ImportExportEvenements onImported={charger} />
+        </div>
       </div>
 
       {stats && (

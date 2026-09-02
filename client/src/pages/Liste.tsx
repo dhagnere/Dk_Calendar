@@ -3,6 +3,7 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Evenement } from '../types';
 import { ValidationBadge } from '../components/ValidationBadge';
+import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
@@ -25,7 +26,6 @@ export default function Liste() {
     quartiers: [],
     statuts: [],
   });
-  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   const charger = async () => {
     setChargement(true);
@@ -65,21 +65,6 @@ export default function Liste() {
     charger();
   };
 
-  const exporterCsv = () => {
-    window.open('/api/import/evenements/export', '_blank');
-  };
-
-  const importerCsv = async (fichier: File) => {
-    const form = new FormData();
-    form.append('fichier', fichier);
-    const res = await api.postForm<{ ok: boolean; created: number; updated: number; errors: string[] }>(
-      '/import/evenements',
-      form
-    );
-    setImportMessage(`${res.created} créé(s), ${res.updated} mis à jour, ${res.errors.length} ligne(s) ignorée(s)`);
-    charger();
-  };
-
   const total = evenements.length;
 
   return (
@@ -112,27 +97,10 @@ export default function Liste() {
             ))}
           </Select>
         </div>
-        <div className="ml-auto flex gap-2">
-          <Button variant="secondary" onClick={exporterCsv}>
-            Exporter CSV
-          </Button>
-          {estAdministrateur && (
-            <label className="cursor-pointer">
-              <span className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-blue-700">
-                Importer CSV
-              </span>
-              <input
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={(e) => e.target.files && importerCsv(e.target.files[0])}
-              />
-            </label>
-          )}
+        <div className="ml-auto">
+          <ImportExportEvenements onImported={charger} />
         </div>
       </div>
-
-      {importMessage && <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">{importMessage}</p>}
 
       <p className="text-sm text-slate-500">{total} événement(s)</p>
 
