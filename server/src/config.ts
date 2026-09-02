@@ -15,4 +15,16 @@ export const config = {
   cookieName: 'dk_session',
   isProduction: process.env.NODE_ENV === 'production',
   clientOrigin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
+  // URL publique de l'application, utilisée pour construire les liens dans les emails.
+  appUrl: process.env.APP_URL ?? process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
+  emailFrom: process.env.EMAIL_FROM ?? 'no-reply@dk-calendar.local',
+  // Si non renseigné, les notifications sont envoyées à tous les administrateurs actifs.
+  adminNotificationEmail: process.env.ADMIN_NOTIFICATION_EMAIL,
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT ?? '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
 };

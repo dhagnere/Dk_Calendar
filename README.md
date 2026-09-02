@@ -13,13 +13,19 @@ Reconstruction en application web **autonome** (indépendante de monday.com) de 
 Implémenté :
 - Connexion / création du premier compte administrateur
 - Gestion des comptes (créer, suspendre/activer, réinitialiser le mot de passe) — administrateurs uniquement
+- **Demande d'accès en libre-service** : un utilisateur sans compte peut en demander un depuis l'écran de connexion ;
+  un **vrai email** est envoyé aux administrateurs actifs à chaque nouvelle demande (voir section Emails ci-dessous) ;
+  l'admin approuve (en choisissant le rôle) ou rejette depuis l'écran **Demandes d'accès**
+- Séparation stricte des fonctions Administrateur / Consultant : les pages et routes API réservées aux
+  administrateurs redirigent/rejettent explicitement les Consultants (pas seulement masquées dans le menu)
 - Vue **Calendrier** mensuelle avec pastilles de validation et archivage automatique des événements passés
 - Vue **Liste** avec filtres (quartier, statut, recherche), validations en un clic
 - **Import / export CSV** des événements et des utilisateurs
 
 Volontairement laissé pour une itération suivante (voir `reference-vibe-export/` pour la logique d'origine) :
-- Vue Carte / géocodage, Vue Conflits, export PDF, demandes d'accès en libre-service, journal d'audit détaillé
-- Envoi d'e-mails réel (pour l'instant, les mots de passe temporaires sont **affichés dans les logs serveur**, jamais envoyés)
+- Vue Carte / géocodage, Vue Conflits, export PDF, journal d'audit détaillé
+- Envoi par email des mots de passe temporaires (création de compte, réinitialisation) — pour l'instant ils sont
+  **affichés dans les logs serveur** ; seule la notification "nouvelle demande d'accès" est un email réel
 
 ## Arborescence
 
@@ -68,6 +74,23 @@ temporaires générés (si non fournis dans le CSV) sont affichés dans la conso
 connexion (bouton "Créer le compte administrateur" au premier lancement) puis créez les autres comptes depuis
 l'écran **Comptes**.
 
+### Emails (notification des administrateurs)
+
+Chaque nouvelle demande d'accès envoie un email aux administrateurs actifs. Sans configuration SMTP, l'email est
+simplement affiché dans les logs serveur (pratique en développement).
+
+Pour l'activer réellement, renseignez dans `server/.env` (voir les exemples commentés dans `server/.env.example`) :
+
+- **Brevo** (recommandé — gratuit jusqu'à 300 emails/jour, sans carte bancaire) :
+  1. Créez un compte sur https://www.brevo.com
+  2. **SMTP & API → SMTP** : récupérez l'hôte (`smtp-relay.brevo.com`), le login et la clé SMTP
+  3. Renseignez `SMTP_HOST`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASS`
+- **Gmail** (si vous avez déjà un compte Gmail) : activez la validation en 2 étapes puis générez un
+  "mot de passe d'application" (https://myaccount.google.com/apppasswords) à utiliser comme `SMTP_PASS`
+
+Réglez aussi `EMAIL_FROM` (adresse expéditeur) et `APP_URL` (URL publique de l'app, utilisée dans le lien de
+l'email). En production (Render), ces variables se configurent dans **Environment** — voir `render.yaml`.
+
 ### Lancer en développement
 
 ```bash
@@ -111,9 +134,11 @@ Démarre un MongoDB local + l'application buildée sur http://localhost:4000.
 2. Configurez les variables d'environnement sur l'hébergeur :
    - `MONGODB_URI` = URI Atlas
    - `JWT_SECRET` = valeur aléatoire (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
-   - `CLIENT_ORIGIN` = l'URL publique de l'app (le frontend est servi par le même serveur, donc généralement identique)
+   - `CLIENT_ORIGIN` et `APP_URL` = l'URL publique de l'app (le frontend est servi par le même serveur, donc identiques)
    - `PORT` = celui imposé par l'hébergeur (souvent injecté automatiquement)
    - `NODE_ENV` = `production`
+   - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `EMAIL_FROM` = voir section Emails ci-dessus (sans
+     ces variables, les emails sont juste loggés, l'app fonctionne quand même)
 3. Déployez l'image construite par le `Dockerfile` (la plupart des hébergeurs ci-dessus le détectent automatiquement)
 4. Lancez `npm run seed` une fois (en local, pointé vers l'URI Atlas de prod, ou via un job ponctuel sur l'hébergeur) pour peupler la base, ou créez le compte administrateur directement depuis l'écran de connexion
 
@@ -121,7 +146,9 @@ Démarre un MongoDB local + l'application buildée sur http://localhost:4000.
 
 - Changez `JWT_SECRET` (ne gardez jamais la valeur par défaut du `.env.example`)
 - Les mots de passe temporaires (création de compte, réinitialisation, import CSV) sont pour l'instant **affichés
-  dans les logs serveur** au lieu d'être envoyés par e-mail — pensez à brancher un vrai service d'envoi
-  (Resend, SendGrid...) avant un usage avec des utilisateurs externes
+  dans les logs serveur** au lieu d'être envoyés par e-mail (seule la notification de nouvelle demande d'accès est
+  un vrai email) — pensez à étendre l'envoi réel à ces cas avant un usage avec des utilisateurs externes
+- Ne commitez jamais `SMTP_PASS`/`SMTP_USER` réels dans le dépôt — utilisez `server/.env` (ignoré par git) en local,
+  et les variables d'environnement de l'hébergeur en production
 - `data/utilisateurs.csv` ne doit **jamais** contenir de vrais mots de passe en clair une fois committé dans un
   dépôt partagé — utilisez-le uniquement comme modèle, ou gardez la version réelle hors du contrôle de version

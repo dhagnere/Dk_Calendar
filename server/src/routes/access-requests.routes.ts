@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AccessRequestModel } from '../models/AccessRequest.js';
 import { UserModel } from '../models/User.js';
 import { genererHash } from '../lib/password.js';
+import { notifierNouvelleDemandeAcces } from '../lib/email.js';
 import { requireAdmin } from '../middleware/auth.js';
 
 export const accessRequestsRouter = Router();
@@ -43,6 +44,13 @@ accessRequestsRouter.post('/', async (req, res) => {
   });
 
   console.log(`[demandes-acces] Nouvelle demande d'accès : ${email} (${parsed.data.nom})`);
+
+  notifierNouvelleDemandeAcces({
+    nom: parsed.data.nom,
+    email,
+    organisation: parsed.data.organisation,
+    motif: parsed.data.motif,
+  }).catch((err) => console.error("[demandes-acces] Échec de la notification par email :", err));
   res.json({ ok: true, message: 'Votre demande a été envoyée. Un administrateur vous contactera.' });
 });
 
