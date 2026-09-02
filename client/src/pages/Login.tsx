@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { Box, Button, Card, Center, Input, Text } from '@chakra-ui/react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 
 export default function Login() {
   const { session, connexion } = useAuth();
@@ -95,24 +93,32 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>
+    <Center minH="100vh" bg="gray.50" px="4">
+      <Card.Root w="full" maxW="sm">
+        <Card.Header>
+          <Card.Title>
             {adminExiste === false
               ? 'Créer le compte administrateur'
               : vue === 'demande'
                 ? 'Demander un accès'
                 : 'Connexion — Calendrier Dunkerque'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {message && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{message}</p>}
+          </Card.Title>
+        </Card.Header>
+        <Card.Body>
+          {message && (
+            <Text mb="3" fontSize="sm" bg="amber.50" color="amber.800" px="3" py="2" rounded="md">
+              {message}
+            </Text>
+          )}
 
-          {adminExiste === null && <p className="text-sm text-slate-500">Chargement…</p>}
+          {adminExiste === null && (
+            <Text fontSize="sm" color="gray.500">
+              Chargement…
+            </Text>
+          )}
 
           {adminExiste === false && (
-            <form className="space-y-3" onSubmit={soumettreCreationAdmin}>
+            <Box as="form" display="flex" flexDirection="column" gap="3" onSubmit={soumettreCreationAdmin}>
               <Input placeholder="Nom complet" value={nom} onChange={(e) => setNom(e.target.value)} required />
               <Input
                 type="email"
@@ -129,15 +135,15 @@ export default function Login() {
                 minLength={10}
                 required
               />
-              <Button type="submit" className="w-full" disabled={envoi}>
+              <Button type="submit" colorPalette="blue" w="full" loading={envoi}>
                 Créer le compte administrateur
               </Button>
-            </form>
+            </Box>
           )}
 
           {adminExiste === true && vue === 'connexion' && (
             <>
-              <form className="space-y-3" onSubmit={soumettreConnexion}>
+              <Box as="form" display="flex" flexDirection="column" gap="3" onSubmit={soumettreConnexion}>
                 <Input
                   type="email"
                   placeholder="Email"
@@ -152,26 +158,31 @@ export default function Login() {
                   onChange={(e) => setMotDePasse(e.target.value)}
                   required
                 />
-                <Button type="submit" className="w-full" disabled={envoi}>
+                <Button type="submit" colorPalette="blue" w="full" loading={envoi}>
                   Se connecter
                 </Button>
-              </form>
-              <button
-                type="button"
-                className="mt-3 w-full text-center text-sm text-primary hover:underline"
+              </Box>
+              <Text
+                as="button"
+                mt="3"
+                w="full"
+                textAlign="center"
+                fontSize="sm"
+                color="blue.600"
+                _hover={{ textDecoration: 'underline' }}
                 onClick={() => {
                   setMessage(null);
                   setVue('demande');
                 }}
               >
                 Pas encore de compte ? Demander un accès
-              </button>
+              </Text>
             </>
           )}
 
           {adminExiste === true && vue === 'demande' && (
             <>
-              <form className="space-y-3" onSubmit={soumettreDemandeAcces}>
+              <Box as="form" display="flex" flexDirection="column" gap="3" onSubmit={soumettreDemandeAcces}>
                 <Input
                   placeholder="Nom complet"
                   value={nomDemande}
@@ -195,24 +206,29 @@ export default function Login() {
                   value={motifDemande}
                   onChange={(e) => setMotifDemande(e.target.value)}
                 />
-                <Button type="submit" className="w-full" disabled={envoi}>
+                <Button type="submit" colorPalette="blue" w="full" loading={envoi}>
                   Envoyer la demande
                 </Button>
-              </form>
-              <button
-                type="button"
-                className="mt-3 w-full text-center text-sm text-slate-500 hover:underline"
+              </Box>
+              <Text
+                as="button"
+                mt="3"
+                w="full"
+                textAlign="center"
+                fontSize="sm"
+                color="gray.500"
+                _hover={{ textDecoration: 'underline' }}
                 onClick={() => {
                   setMessage(null);
                   setVue('connexion');
                 }}
               >
                 ← Retour à la connexion
-              </button>
+              </Text>
             </>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </Card.Body>
+      </Card.Root>
+    </Center>
   );
 }

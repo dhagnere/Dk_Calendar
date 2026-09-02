@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Box, Button, Card, HStack, NativeSelect, Text } from '@chakra-ui/react';
 import { api } from '../api';
 import type { DemandeAcces } from '../types';
-import { Button } from '../components/ui/Button';
-import { Select } from '../components/ui/Select';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { genererMotDePasse } from '../lib/generatePassword';
 
 export default function Demandes() {
@@ -43,54 +41,72 @@ export default function Demandes() {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Demandes d'accès en attente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {message && <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">{message}</p>}
+    <Box>
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>Demandes d'accès en attente</Card.Title>
+        </Card.Header>
+        <Card.Body>
+          {message && (
+            <Text mb="3" fontSize="sm" bg="blue.50" color="blue.800" px="3" py="2" rounded="md">
+              {message}
+            </Text>
+          )}
 
-          {demandes.length === 0 && <p className="text-sm text-slate-400">Aucune demande en attente.</p>}
+          {demandes.length === 0 && (
+            <Text fontSize="sm" color="gray.400">
+              Aucune demande en attente.
+            </Text>
+          )}
 
-          <div className="space-y-3">
+          <Box display="flex" flexDirection="column" gap="3">
             {demandes.map((d) => (
-              <div key={d._id} className="rounded-md border border-slate-200 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-700">
-                      {d.nom} <span className="font-normal text-slate-400">— {d.email}</span>
-                    </p>
-                    {d.organisation && <p className="text-xs text-slate-500">Organisation : {d.organisation}</p>}
-                    {d.motif && <p className="mt-1 text-sm text-slate-600">« {d.motif} »</p>}
-                    <p className="mt-1 text-xs text-slate-400">
+              <Box key={d._id} borderWidth="1px" borderColor="gray.200" rounded="md" p="3">
+                <HStack align="start" justify="space-between" wrap="wrap" gap="3">
+                  <Box>
+                    <Text fontWeight="medium" color="gray.700">
+                      {d.nom} <Text as="span" fontWeight="normal" color="gray.400">— {d.email}</Text>
+                    </Text>
+                    {d.organisation && (
+                      <Text fontSize="xs" color="gray.500">
+                        Organisation : {d.organisation}
+                      </Text>
+                    )}
+                    {d.motif && (
+                      <Text mt="1" fontSize="sm" color="gray.600">
+                        « {d.motif} »
+                      </Text>
+                    )}
+                    <Text mt="1" fontSize="xs" color="gray.400">
                       Demandé le {new Date(d.createdAt).toLocaleDateString('fr-FR')}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={roleDe(d._id)}
-                      onChange={(e) =>
-                        setRoleParDemande((r) => ({ ...r, [d._id]: e.target.value as 'Administrateur' | 'Consultant' }))
-                      }
-                      className="w-40"
-                    >
-                      <option value="Consultant">Consultant</option>
-                      <option value="Administrateur">Administrateur</option>
-                    </Select>
-                    <Button className="px-3 py-1.5 text-xs" onClick={() => approuver(d)}>
+                    </Text>
+                  </Box>
+                  <HStack gap="2">
+                    <NativeSelect.Root w="40">
+                      <NativeSelect.Field
+                        value={roleDe(d._id)}
+                        onChange={(e) =>
+                          setRoleParDemande((r) => ({ ...r, [d._id]: e.target.value as 'Administrateur' | 'Consultant' }))
+                        }
+                      >
+                        <option value="Consultant">Consultant</option>
+                        <option value="Administrateur">Administrateur</option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                    <Button size="xs" colorPalette="blue" onClick={() => approuver(d)}>
                       Approuver
                     </Button>
-                    <Button variant="danger" className="px-3 py-1.5 text-xs" onClick={() => rejeter(d)}>
+                    <Button size="xs" colorPalette="red" onClick={() => rejeter(d)}>
                       Rejeter
                     </Button>
-                  </div>
-                </div>
-              </div>
+                  </HStack>
+                </HStack>
+              </Box>
             ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </Box>
+        </Card.Body>
+      </Card.Root>
+    </Box>
   );
 }

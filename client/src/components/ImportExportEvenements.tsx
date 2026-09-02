@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Box, Button, HStack, Text } from '@chakra-ui/react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Button } from './ui/Button';
 
 /** Boutons d'export CSV (tout le monde) et d'import CSV (admin uniquement), avec message de résultat. */
 export function ImportExportEvenements({ onImported }: { onImported: () => void }) {
   const { estAdministrateur } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const exporterCsv = () => {
     window.open('/api/import/evenements/export', '_blank');
@@ -27,31 +28,36 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
       onImported();
     } finally {
       setEnCours(false);
+      if (inputRef.current) inputRef.current.value = '';
     }
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={exporterCsv}>
+    <Box>
+      <HStack gap="2">
+        <Button variant="subtle" colorPalette="gray" onClick={exporterCsv}>
           Exporter CSV
         </Button>
         {estAdministrateur && (
-          <label className={`cursor-pointer ${enCours ? 'pointer-events-none opacity-50' : ''}`}>
-            <span className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-blue-700">
-              {enCours ? 'Import en cours…' : 'Importer CSV'}
-            </span>
+          <>
+            <Button colorPalette="blue" loading={enCours} onClick={() => inputRef.current?.click()}>
+              Importer CSV
+            </Button>
             <input
+              ref={inputRef}
               type="file"
               accept=".csv"
-              className="hidden"
-              disabled={enCours}
-              onChange={(e) => e.target.files && importerCsv(e.target.files[0])}
+              hidden
+              onChange={(e) => e.target.files?.[0] && importerCsv(e.target.files[0])}
             />
-          </label>
+          </>
         )}
-      </div>
-      {message && <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">{message}</p>}
-    </div>
+      </HStack>
+      {message && (
+        <Text mt="2" fontSize="sm" bg="blue.50" color="blue.800" px="3" py="2" rounded="md">
+          {message}
+        </Text>
+      )}
+    </Box>
   );
 }

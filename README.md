@@ -4,7 +4,7 @@ Reconstruction en application web **autonome** (indépendante de monday.com) de 
 `reference-vibe-export/` (qui reste dans le dépôt comme référence pour les fonctionnalités non encore reconstruites).
 
 - **Backend** : Node.js + Express + TypeScript, base de données **MongoDB** (Mongoose)
-- **Frontend** : React + Vite + TypeScript + Tailwind CSS
+- **Frontend** : React + Vite + TypeScript + Chakra UI
 - **Auth** : comptes Administrateur / Consultant, mot de passe haché (PBKDF2 + sel), session via cookie JWT
 - **Données** : deux fichiers CSV (`data/evenements.csv`, `data/utilisateurs.csv`) servent de **base d'import/seed**
 

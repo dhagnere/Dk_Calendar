@@ -1,54 +1,77 @@
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
+import { Badge, Box, Button, Container, Flex, HStack, Text } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
-import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 
-const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-md px-3 py-2 text-sm font-medium ${isActive ? 'bg-primary text-primary-foreground' : 'text-slate-600 hover:bg-slate-100'}`;
+function NavItem({ to, end, children }: { to: string; end?: boolean; children: React.ReactNode }) {
+  return (
+    <NavLink to={to} end={end}>
+      {({ isActive }) => (
+        <Box
+          px="3"
+          py="2"
+          rounded="md"
+          fontSize="sm"
+          fontWeight="medium"
+          bg={isActive ? 'blue.600' : 'transparent'}
+          color={isActive ? 'white' : 'gray.600'}
+          _hover={{ bg: isActive ? 'blue.600' : 'gray.100' }}
+        >
+          {children}
+        </Box>
+      )}
+    </NavLink>
+  );
+}
 
 export function AppLayout() {
   const { session, loading, estAdministrateur, deconnexion } = useAuth();
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-slate-500">Chargement…</div>;
+  if (loading) {
+    return (
+      <Flex h="100vh" align="center" justify="center" color="gray.500">
+        Chargement…
+      </Flex>
+    );
+  }
   if (!session) return <Navigate to="/connexion" replace />;
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-6">
-            <span className="text-lg font-bold text-slate-800">📅 Calendrier Dunkerque</span>
-            <nav className="flex gap-1">
-              <NavLink to="/" end className={linkClass}>
-                Calendrier
-              </NavLink>
-              <NavLink to="/liste" className={linkClass}>
-                Liste
-              </NavLink>
-              {estAdministrateur && (
-                <>
-                  <NavLink to="/comptes" className={linkClass}>
-                    Comptes
-                  </NavLink>
-                  <NavLink to="/demandes" className={linkClass}>
-                    Demandes d'accès
-                  </NavLink>
-                </>
-              )}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            {!estAdministrateur && <Badge tone="blue">Consultation seule</Badge>}
-            <span className="text-sm text-slate-600">{session.nom}</span>
-            <Button variant="secondary" onClick={() => deconnexion()}>
-              Déconnexion
-            </Button>
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+    <Box minH="100vh">
+      <Box borderBottomWidth="1px" borderColor="gray.200" bg="white">
+        <Container maxW="6xl" py="3">
+          <Flex align="center" justify="space-between">
+            <HStack gap="6">
+              <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                📅 Calendrier Dunkerque
+              </Text>
+              <HStack gap="1">
+                <NavItem to="/" end>
+                  Calendrier
+                </NavItem>
+                <NavItem to="/liste">Liste</NavItem>
+                {estAdministrateur && (
+                  <>
+                    <NavItem to="/comptes">Comptes</NavItem>
+                    <NavItem to="/demandes">Demandes d'accès</NavItem>
+                  </>
+                )}
+              </HStack>
+            </HStack>
+            <HStack gap="3">
+              {!estAdministrateur && <Badge colorPalette="blue">Consultation seule</Badge>}
+              <Text fontSize="sm" color="gray.600">
+                {session.nom}
+              </Text>
+              <Button variant="subtle" colorPalette="gray" onClick={() => deconnexion()}>
+                Déconnexion
+              </Button>
+            </HStack>
+          </Flex>
+        </Container>
+      </Box>
+      <Container maxW="6xl" py="6">
         <Outlet />
-      </main>
-    </div>
+      </Container>
+    </Box>
   );
 }

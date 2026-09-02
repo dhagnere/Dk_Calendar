@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Box, Button, Dialog, HStack, Heading, Portal, SimpleGrid, Text } from '@chakra-ui/react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
-import { Button } from '../components/ui/Button';
-import { Dialog, DialogBody, DialogHeader } from '../components/ui/Dialog';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { FicheEvenement } from '../components/FicheEvenement';
 
@@ -27,8 +26,8 @@ function memeJour(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function chipClasse(e: Evenement): string {
-  return estValide(e) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+function couleursChip(e: Evenement): { bg: string; color: string } {
+  return estValide(e) ? { bg: 'green.100', color: 'green.800' } : { bg: 'red.100', color: 'red.800' };
 }
 
 export default function Calendrier() {
@@ -93,127 +92,189 @@ export default function Calendrier() {
   const evenementsJourOuvert = jourSelectionne ? evenementsDuJour(jourSelectionne) : [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() - 1, 1))}>
+    <Box>
+      <HStack justify="space-between" wrap="wrap" gap="3" mb="4">
+        <HStack gap="2">
+          <Button variant="subtle" colorPalette="gray" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() - 1, 1))}>
             ←
           </Button>
-          <h2 className="w-48 text-center text-lg font-semibold text-slate-700">
+          <Heading size="md" w="48" textAlign="center" color="gray.700">
             {MOIS[mois.getMonth()]} {mois.getFullYear()}
-          </h2>
-          <Button variant="secondary" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() + 1, 1))}>
+          </Heading>
+          <Button variant="subtle" colorPalette="gray" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() + 1, 1))}>
             →
           </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+        </HStack>
+        <HStack gap="2" wrap="wrap">
           {estAdministrateur && (
-            <Button variant="secondary" onClick={archiverPasses}>
+            <Button variant="subtle" colorPalette="gray" onClick={archiverPasses}>
               Archiver les événements passés
             </Button>
           )}
           <ImportExportEvenements onImported={charger} />
-        </div>
-      </div>
+        </HStack>
+      </HStack>
 
       {stats && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
-            <p className="text-2xl font-bold text-slate-800">{stats.total}</p>
-            <p className="text-xs text-slate-500">Total affiché</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
-            <p className="text-2xl font-bold text-green-600">{stats.validated}</p>
-            <p className="text-xs text-slate-500">Validés</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
-            <p className="text-2xl font-bold text-orange-600">{stats.pending}</p>
-            <p className="text-xs text-slate-500">En attente</p>
-          </div>
-        </div>
+        <SimpleGrid columns={3} gap="3" mb="4">
+          <Box borderWidth="1px" borderColor="gray.200" bg="white" rounded="lg" p="3" textAlign="center">
+            <Text fontSize="2xl" fontWeight="bold" color="gray.800">
+              {stats.total}
+            </Text>
+            <Text fontSize="xs" color="gray.500">
+              Total affiché
+            </Text>
+          </Box>
+          <Box borderWidth="1px" borderColor="gray.200" bg="white" rounded="lg" p="3" textAlign="center">
+            <Text fontSize="2xl" fontWeight="bold" color="green.600">
+              {stats.validated}
+            </Text>
+            <Text fontSize="xs" color="gray.500">
+              Validés
+            </Text>
+          </Box>
+          <Box borderWidth="1px" borderColor="gray.200" bg="white" rounded="lg" p="3" textAlign="center">
+            <Text fontSize="2xl" fontWeight="bold" color="orange.600">
+              {stats.pending}
+            </Text>
+            <Text fontSize="xs" color="gray.500">
+              En attente
+            </Text>
+          </Box>
+        </SimpleGrid>
       )}
 
-      <div className="flex items-center gap-4 text-xs text-slate-500">
-        <span className="font-medium text-slate-600">Légende :</span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded bg-green-100" />
+      <HStack gap="4" mb="2" fontSize="xs" color="gray.500">
+        <Text fontWeight="medium" color="gray.600">
+          Légende :
+        </Text>
+        <HStack gap="1.5">
+          <Box h="3" w="3" rounded="sm" bg="green.100" />
           Validée
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded bg-red-100" />
+        </HStack>
+        <HStack gap="1.5">
+          <Box h="3" w="3" rounded="sm" bg="red.100" />
           Non validée
-        </span>
-      </div>
+        </HStack>
+      </HStack>
 
-      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200">
+      <SimpleGrid columns={7} gap="1px" bg="gray.200" borderWidth="1px" borderColor="gray.200" rounded="lg" overflow="hidden">
         {JOURS.map((j) => (
-          <div key={j} className="bg-slate-100 py-2 text-center text-xs font-semibold text-slate-500">
+          <Box key={j} bg="gray.100" py="2" textAlign="center" fontSize="xs" fontWeight="semibold" color="gray.500">
             {j}
-          </div>
+          </Box>
         ))}
         {jours.map((jour) => {
           const evts = evenementsDuJour(jour);
           const horsMois = jour.getMonth() !== mois.getMonth();
           const surplus = evts.length - MAX_LIGNES_VISIBLES;
+          const estAujourdhui = memeJour(jour, new Date());
           return (
-            <button
+            <Box
               key={jour.toISOString()}
+              as="button"
               onClick={() => setJourSelectionne(jour)}
-              className={`min-h-[132px] bg-white p-1.5 text-left align-top hover:bg-slate-50 ${horsMois ? 'text-slate-300' : 'text-slate-700'}`}
+              minH="132px"
+              bg="white"
+              p="1.5"
+              textAlign="left"
+              color={horsMois ? 'gray.300' : 'gray.700'}
+              _hover={{ bg: 'gray.50' }}
             >
-              <span className={`text-xs ${memeJour(jour, new Date()) ? 'rounded-full bg-primary px-1.5 py-0.5 text-white' : ''}`}>
+              <Text
+                as="span"
+                fontSize="xs"
+                rounded="full"
+                px={estAujourdhui ? '1.5' : undefined}
+                py={estAujourdhui ? '0.5' : undefined}
+                bg={estAujourdhui ? 'blue.600' : undefined}
+                color={estAujourdhui ? 'white' : undefined}
+              >
                 {jour.getDate()}
-              </span>
-              <div className="mt-1 space-y-0.5">
-                {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => (
-                  <div
-                    key={e._id}
-                    className={`truncate rounded px-1 py-[1px] text-[10px] leading-tight ${chipClasse(e)}`}
-                    title={e.nom}
-                  >
-                    {e.nom}
-                  </div>
-                ))}
+              </Text>
+              <Box mt="1" display="flex" flexDirection="column" gap="1">
+                {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => {
+                  const couleurs = couleursChip(e);
+                  return (
+                    <Box
+                      key={e._id}
+                      overflow="hidden"
+                      whiteSpace="nowrap"
+                      textOverflow="ellipsis"
+                      rounded="sm"
+                      px="1"
+                      fontSize="10px"
+                      lineHeight="1.2"
+                      bg={couleurs.bg}
+                      color={couleurs.color}
+                      title={e.nom}
+                    >
+                      {e.nom}
+                    </Box>
+                  );
+                })}
                 {surplus > 0 && (
-                  <div className="truncate px-1 text-[10px] font-semibold text-slate-500">
+                  <Text fontSize="10px" fontWeight="semibold" color="gray.500">
                     +{surplus} événement{surplus > 1 ? 's' : ''}
-                  </div>
+                  </Text>
                 )}
-              </div>
-            </button>
+              </Box>
+            </Box>
           );
         })}
-      </div>
+      </SimpleGrid>
 
-      <Dialog open={!!jourSelectionne} onClose={() => setJourSelectionne(null)}>
-        {jourSelectionne && (
-          <>
-            <DialogHeader
-              title={jourSelectionne.toLocaleDateString('fr-FR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-              onClose={() => setJourSelectionne(null)}
-            />
-            <DialogBody>
-              <div className="space-y-3">
-                {evenementsJourOuvert.length === 0 && <p className="text-sm text-slate-400">Aucun événement ce jour.</p>}
-                {evenementsJourOuvert.map((e) => (
-                  <FicheEvenement
-                    key={e._id}
-                    evenement={e}
-                    estAdministrateur={estAdministrateur}
-                    onToggleValidation={toggleValidation}
-                    onValider={validerUnClic}
-                  />
-                ))}
-              </div>
-            </DialogBody>
-          </>
-        )}
-      </Dialog>
-    </div>
+      <Dialog.Root open={!!jourSelectionne} onOpenChange={(d) => !d.open && setJourSelectionne(null)}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="2xl" maxH="85vh" overflowY="auto">
+              {jourSelectionne && (
+                <>
+                  <Dialog.Header>
+                    <Dialog.Title textTransform="capitalize">
+                      {jourSelectionne.toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </Dialog.Title>
+                  </Dialog.Header>
+                  <Dialog.CloseTrigger
+                    position="absolute"
+                    top="3"
+                    right="3"
+                    fontSize="xl"
+                    color="gray.400"
+                    _hover={{ color: 'gray.600' }}
+                  >
+                    ×
+                  </Dialog.CloseTrigger>
+                  <Dialog.Body>
+                    <Box display="flex" flexDirection="column" gap="3">
+                      {evenementsJourOuvert.length === 0 && (
+                        <Text fontSize="sm" color="gray.400">
+                          Aucun événement ce jour.
+                        </Text>
+                      )}
+                      {evenementsJourOuvert.map((e) => (
+                        <FicheEvenement
+                          key={e._id}
+                          evenement={e}
+                          estAdministrateur={estAdministrateur}
+                          onToggleValidation={toggleValidation}
+                          onValider={validerUnClic}
+                        />
+                      ))}
+                    </Box>
+                  </Dialog.Body>
+                </>
+              )}
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    </Box>
   );
 }
