@@ -4,6 +4,7 @@ import { Button, Card, Col, DatePicker, Modal, Row, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
+import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { FicheEvenement } from '../components/FicheEvenement';
 
@@ -17,8 +18,6 @@ const MOIS = [
 
 const MAX_LIGNES_VISIBLES = 4;
 const COULEUR_BORDURE = '#bfbfbf';
-const COULEUR_VALIDE = '#52c41a';
-const COULEUR_NON_VALIDE = '#ff4d4f';
 
 function debutSemaine(date: Date): Date {
   const jour = (date.getDay() + 6) % 7; // 0 = lundi

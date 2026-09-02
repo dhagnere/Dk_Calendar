@@ -1,6 +1,7 @@
 import { Button, Card, Checkbox, Descriptions, Typography } from 'antd';
-import type { Evenement } from '../types';
+import { estValide, type Evenement } from '../types';
 import { formatDate } from '../lib/formatDate';
+import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ValidationBadge } from './ValidationBadge';
 
 interface Props {
@@ -31,9 +32,12 @@ export function FicheEvenement({ evenement, estAdministrateur, onToggleValidatio
     },
   ];
 
+  const couleurBordure = estValide(evenement) ? COULEUR_VALIDE : COULEUR_NON_VALIDE;
+
   return (
     <Card
       size="small"
+      style={{ borderWidth: 2, borderColor: couleurBordure }}
       title={
         <div>
           <Typography.Text strong>{evenement.nom}</Typography.Text>
