@@ -1,0 +1,4 @@
+eventId,nom,dateDeDebut,dateDeFin,lieu,quartier,pilote,directionPilote,organisateur,nature,niveau,type,statut,tardive,reprog,validationTechnique,validationPolitique,validParDateClef,statutDimport
+EVT-2026-0001,Fête de la musique,21/06/2026,21/06/2026,Place Jean Bart,Dunkerque - Centre,Eva LELEU,Direction Culture,Ville de Dunkerque,Culture,Ville,Événement,À valider,Non,Non,Non,Non,Non,Exemple
+EVT-2026-0002,Brocante de Malo,05/07/2026,05/07/2026,Digue de Mer,Malo-les-Bains,Sandrine CLAEYS,Direction Animation,Comité des fêtes,Brocantes,Associatif,Récurrente,Validée,Non,Non,Oui,Oui,Non,Exemple
+EVT-2026-0003,Conseil de quartier Rosendaël,12/03/2026,12/03/2026,Mairie annexe,Rosendaël,Philippe MORTIER,Direction Vie Citoyenne,Ville de Dunkerque,"Assemblée (Conseil Municipal, Conseil de Quartier ...)",Ville,Événement,Brouillon,Non,Non,Non,Non,Non,Exemple
