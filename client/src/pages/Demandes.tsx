@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Box, Button, Card, HStack, NativeSelect, Text } from '@chakra-ui/react';
+import { Button, Card, Select, Typography } from 'antd';
 import { api } from '../api';
 import type { DemandeAcces } from '../types';
 import { genererMotDePasse } from '../lib/generatePassword';
+
+const { Text } = Typography;
 
 export default function Demandes() {
   const [demandes, setDemandes] = useState<DemandeAcces[]>([]);
@@ -41,72 +43,58 @@ export default function Demandes() {
   };
 
   return (
-    <Box>
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Demandes d'accès en attente</Card.Title>
-        </Card.Header>
-        <Card.Body>
-          {message && (
-            <Text mb="3" fontSize="sm" bg="blue.50" color="blue.800" px="3" py="2" rounded="md">
-              {message}
-            </Text>
-          )}
+    <div>
+      <Card title="Demandes d'accès en attente">
+        {message && (
+          <Text
+            style={{ display: 'block', marginBottom: 12, fontSize: 13, background: '#e6f4ff', color: '#0958d9', padding: '6px 12px', borderRadius: 6 }}
+          >
+            {message}
+          </Text>
+        )}
 
-          {demandes.length === 0 && (
-            <Text fontSize="sm" color="gray.400">
-              Aucune demande en attente.
-            </Text>
-          )}
+        {demandes.length === 0 && <Text type="secondary">Aucune demande en attente.</Text>}
 
-          <Box display="flex" flexDirection="column" gap="3">
-            {demandes.map((d) => (
-              <Box key={d._id} borderWidth="1px" borderColor="gray.200" rounded="md" p="3">
-                <HStack align="start" justify="space-between" wrap="wrap" gap="3">
-                  <Box>
-                    <Text fontWeight="medium" color="gray.700">
-                      {d.nom} <Text as="span" fontWeight="normal" color="gray.400">— {d.email}</Text>
-                    </Text>
-                    {d.organisation && (
-                      <Text fontSize="xs" color="gray.500">
-                        Organisation : {d.organisation}
-                      </Text>
-                    )}
-                    {d.motif && (
-                      <Text mt="1" fontSize="sm" color="gray.600">
-                        « {d.motif} »
-                      </Text>
-                    )}
-                    <Text mt="1" fontSize="xs" color="gray.400">
-                      Demandé le {new Date(d.createdAt).toLocaleDateString('fr-FR')}
-                    </Text>
-                  </Box>
-                  <HStack gap="2">
-                    <NativeSelect.Root w="40">
-                      <NativeSelect.Field
-                        value={roleDe(d._id)}
-                        onChange={(e) =>
-                          setRoleParDemande((r) => ({ ...r, [d._id]: e.target.value as 'Administrateur' | 'Consultant' }))
-                        }
-                      >
-                        <option value="Consultant">Consultant</option>
-                        <option value="Administrateur">Administrateur</option>
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                    <Button size="xs" colorPalette="blue" onClick={() => approuver(d)}>
-                      Approuver
-                    </Button>
-                    <Button size="xs" colorPalette="red" onClick={() => rejeter(d)}>
-                      Rejeter
-                    </Button>
-                  </HStack>
-                </HStack>
-              </Box>
-            ))}
-          </Box>
-        </Card.Body>
-      </Card.Root>
-    </Box>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {demandes.map((d) => (
+            <div key={d._id} style={{ border: '1px solid #f0f0f0', borderRadius: 6, padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Text strong>
+                    {d.nom} <Text type="secondary">— {d.email}</Text>
+                  </Text>
+                  {d.organisation && (
+                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>Organisation : {d.organisation}</div>
+                  )}
+                  {d.motif && (
+                    <div style={{ marginTop: 4, fontSize: 13, color: '#595959' }}>« {d.motif} »</div>
+                  )}
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#bfbfbf' }}>
+                    Demandé le {new Date(d.createdAt).toLocaleDateString('fr-FR')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <Select
+                    value={roleDe(d._id)}
+                    onChange={(v) => setRoleParDemande((r) => ({ ...r, [d._id]: v as 'Administrateur' | 'Consultant' }))}
+                    style={{ width: 160 }}
+                    options={[
+                      { value: 'Consultant', label: 'Consultant' },
+                      { value: 'Administrateur', label: 'Administrateur' },
+                    ]}
+                  />
+                  <Button type="primary" size="small" onClick={() => approuver(d)}>
+                    Approuver
+                  </Button>
+                  <Button danger size="small" onClick={() => rejeter(d)}>
+                    Rejeter
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }

@@ -1,10 +1,6 @@
-import { Badge } from '@chakra-ui/react';
+import { Tag } from 'antd';
 import { estValide, type Evenement } from '../types';
 
 export function ValidationBadge({ evenement }: { evenement: Evenement }) {
-  return estValide(evenement) ? (
-    <Badge colorPalette="green">Validée</Badge>
-  ) : (
-    <Badge colorPalette="red">Non validée</Badge>
-  );
+  return estValide(evenement) ? <Tag color="green">Validée</Tag> : <Tag color="red">Non validée</Tag>;
 }

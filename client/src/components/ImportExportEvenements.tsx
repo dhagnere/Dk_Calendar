@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { Box, Button, HStack, Text } from '@chakra-ui/react';
+import { Button, Space, Typography } from 'antd';
+import { UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -33,14 +34,14 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
   };
 
   return (
-    <Box>
-      <HStack gap="2">
-        <Button variant="subtle" colorPalette="gray" onClick={exporterCsv}>
+    <div>
+      <Space>
+        <Button icon={<DownloadOutlined />} onClick={exporterCsv}>
           Exporter CSV
         </Button>
         {estAdministrateur && (
           <>
-            <Button colorPalette="blue" loading={enCours} onClick={() => inputRef.current?.click()}>
+            <Button type="primary" icon={<UploadOutlined />} loading={enCours} onClick={() => inputRef.current?.click()}>
               Importer CSV
             </Button>
             <input
@@ -52,12 +53,12 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
             />
           </>
         )}
-      </HStack>
+      </Space>
       {message && (
-        <Text mt="2" fontSize="sm" bg="blue.50" color="blue.800" px="3" py="2" rounded="md">
+        <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0, background: '#e6f4ff', color: '#0958d9', padding: '6px 12px', borderRadius: 6 }}>
           {message}
-        </Text>
+        </Typography.Paragraph>
       )}
-    </Box>
+    </div>
   );
 }

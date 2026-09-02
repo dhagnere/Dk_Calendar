@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Button, Dialog, HStack, Heading, Portal, SimpleGrid, Text } from '@chakra-ui/react';
+import { Button, Card, Col, Modal, Row, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { FicheEvenement } from '../components/FicheEvenement';
+
+const { Title, Text } = Typography;
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MOIS = [
@@ -27,7 +29,11 @@ function memeJour(a: Date, b: Date): boolean {
 }
 
 function couleursChip(e: Evenement): { bg: string; color: string } {
-  return estValide(e) ? { bg: 'green.100', color: 'green.800' } : { bg: 'red.100', color: 'red.800' };
+  return estValide(e) ? { bg: '#f6ffed', color: '#389e0d' } : { bg: '#fff1f0', color: '#cf1322' };
+}
+
+function majusculeInitiale(texte: string): string {
+  return texte.charAt(0).toUpperCase() + texte.slice(1);
 }
 
 export default function Calendrier() {
@@ -92,189 +98,169 @@ export default function Calendrier() {
   const evenementsJourOuvert = jourSelectionne ? evenementsDuJour(jourSelectionne) : [];
 
   return (
-    <Box>
-      <HStack justify="space-between" wrap="wrap" gap="3" mb="4">
-        <HStack gap="2">
-          <Button variant="subtle" colorPalette="gray" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() - 1, 1))}>
-            ←
-          </Button>
-          <Heading size="md" w="48" textAlign="center" color="gray.800">
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Button onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() - 1, 1))}>←</Button>
+          <Title level={4} style={{ width: 180, textAlign: 'center', margin: 0 }}>
             {MOIS[mois.getMonth()]} {mois.getFullYear()}
-          </Heading>
-          <Button variant="subtle" colorPalette="gray" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() + 1, 1))}>
-            →
-          </Button>
-        </HStack>
-        <HStack gap="2" wrap="wrap">
-          {estAdministrateur && (
-            <Button variant="subtle" colorPalette="gray" onClick={archiverPasses}>
-              Archiver les événements passés
-            </Button>
-          )}
+          </Title>
+          <Button onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() + 1, 1))}>→</Button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {estAdministrateur && <Button onClick={archiverPasses}>Archiver les événements passés</Button>}
           <ImportExportEvenements onImported={charger} />
-        </HStack>
-      </HStack>
+        </div>
+      </div>
 
       {stats && (
-        <SimpleGrid columns={3} gap="3" mb="4">
-          <Box borderWidth="1px" borderColor="gray.200" bg="white" rounded="lg" p="3" textAlign="center">
-            <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-              {stats.total}
-            </Text>
-            <Text fontSize="xs" color="gray.700">
-              Total affiché
-            </Text>
-          </Box>
-          <Box borderWidth="1px" borderColor="gray.200" bg="white" rounded="lg" p="3" textAlign="center">
-            <Text fontSize="2xl" fontWeight="bold" color="green.600">
-              {stats.validated}
-            </Text>
-            <Text fontSize="xs" color="gray.700">
-              Validés
-            </Text>
-          </Box>
-          <Box borderWidth="1px" borderColor="gray.200" bg="white" rounded="lg" p="3" textAlign="center">
-            <Text fontSize="2xl" fontWeight="bold" color="orange.600">
-              {stats.pending}
-            </Text>
-            <Text fontSize="xs" color="gray.700">
-              En attente
-            </Text>
-          </Box>
-        </SimpleGrid>
+        <Row gutter={12} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Total affiché
+              </Text>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#389e0d' }}>{stats.validated}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Validés
+              </Text>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#d46b08' }}>{stats.pending}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                En attente
+              </Text>
+            </Card>
+          </Col>
+        </Row>
       )}
 
-      <HStack gap="4" mb="2" fontSize="xs" color="gray.700">
-        <Text fontWeight="medium" color="gray.800">
+      <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 12, color: '#595959', alignItems: 'center' }}>
+        <Text strong style={{ fontSize: 12 }}>
           Légende :
         </Text>
-        <HStack gap="1.5">
-          <Box h="3" w="3" rounded="sm" bg="green.100" />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#f6ffed', border: '1px solid #b7eb8f' }} />
           Validée
-        </HStack>
-        <HStack gap="1.5">
-          <Box h="3" w="3" rounded="sm" bg="red.100" />
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#fff1f0', border: '1px solid #ffa39e' }} />
           Non validée
-        </HStack>
-      </HStack>
+        </span>
+      </div>
 
-      <SimpleGrid columns={7} gap="1px" bg="gray.200" borderWidth="1px" borderColor="gray.200" rounded="lg" overflow="hidden">
-        {JOURS.map((j) => (
-          <Box key={j} bg="gray.100" py="2" textAlign="center" fontSize="xs" fontWeight="semibold" color="gray.700">
-            {j}
-          </Box>
-        ))}
-        {jours.map((jour) => {
-          const evts = evenementsDuJour(jour);
-          const horsMois = jour.getMonth() !== mois.getMonth();
-          const surplus = evts.length - MAX_LIGNES_VISIBLES;
-          const estAujourdhui = memeJour(jour, new Date());
-          return (
-            <Box
-              key={jour.toISOString()}
-              as="button"
-              onClick={() => setJourSelectionne(jour)}
-              minH="132px"
-              bg="white"
-              p="1.5"
-              textAlign="left"
-              color={horsMois ? 'gray.300' : 'gray.900'}
-              _hover={{ bg: 'gray.50' }}
+      <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#fafafa' }}>
+          {JOURS.map((j) => (
+            <div
+              key={j}
+              style={{ textAlign: 'center', padding: '8px 0', fontSize: 12, fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0' }}
             >
-              <Text
-                as="span"
-                fontSize="xs"
-                rounded="full"
-                px={estAujourdhui ? '1.5' : undefined}
-                py={estAujourdhui ? '0.5' : undefined}
-                bg={estAujourdhui ? 'blue.600' : undefined}
-                color={estAujourdhui ? 'white' : undefined}
+              {j}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+          {jours.map((jour, idx) => {
+            const evts = evenementsDuJour(jour);
+            const horsMois = jour.getMonth() !== mois.getMonth();
+            const surplus = evts.length - MAX_LIGNES_VISIBLES;
+            const estAujourdhui = memeJour(jour, new Date());
+            return (
+              <button
+                key={jour.toISOString()}
+                onClick={() => setJourSelectionne(jour)}
+                style={{
+                  minHeight: 132,
+                  background: '#fff',
+                  border: 'none',
+                  borderRight: idx % 7 !== 6 ? '1px solid #f0f0f0' : 'none',
+                  borderBottom: '1px solid #f0f0f0',
+                  textAlign: 'left',
+                  padding: 6,
+                  cursor: 'pointer',
+                  color: horsMois ? '#bfbfbf' : '#141414',
+                }}
               >
-                {jour.getDate()}
-              </Text>
-              <Box mt="1" display="flex" flexDirection="column" gap="1">
-                {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => {
-                  const couleurs = couleursChip(e);
-                  return (
-                    <Box
-                      key={e._id}
-                      overflow="hidden"
-                      whiteSpace="nowrap"
-                      textOverflow="ellipsis"
-                      rounded="sm"
-                      px="1"
-                      fontSize="10px"
-                      lineHeight="1.2"
-                      bg={couleurs.bg}
-                      color={couleurs.color}
-                      title={e.nom}
-                    >
-                      {e.nom}
-                    </Box>
-                  );
-                })}
-                {surplus > 0 && (
-                  <Text fontSize="10px" fontWeight="semibold" color="gray.700">
-                    +{surplus} événement{surplus > 1 ? 's' : ''}
-                  </Text>
-                )}
-              </Box>
-            </Box>
-          );
-        })}
-      </SimpleGrid>
+                <span
+                  style={{
+                    fontSize: 12,
+                    borderRadius: 999,
+                    padding: estAujourdhui ? '2px 7px' : undefined,
+                    background: estAujourdhui ? '#1d4ed8' : undefined,
+                    color: estAujourdhui ? '#fff' : undefined,
+                  }}
+                >
+                  {jour.getDate()}
+                </span>
+                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => {
+                    const couleurs = couleursChip(e);
+                    return (
+                      <div
+                        key={e._id}
+                        title={e.nom}
+                        style={{
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          borderRadius: 4,
+                          padding: '0 4px',
+                          fontSize: 10,
+                          lineHeight: 1.4,
+                          background: couleurs.bg,
+                          color: couleurs.color,
+                        }}
+                      >
+                        {e.nom}
+                      </div>
+                    );
+                  })}
+                  {surplus > 0 && (
+                    <div style={{ fontSize: 10, fontWeight: 600, color: '#595959' }}>
+                      +{surplus} événement{surplus > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      <Dialog.Root open={!!jourSelectionne} onOpenChange={(d) => !d.open && setJourSelectionne(null)}>
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content maxW="2xl" maxH="85vh" overflowY="auto">
-              {jourSelectionne && (
-                <>
-                  <Dialog.Header>
-                    <Dialog.Title textTransform="capitalize">
-                      {jourSelectionne.toLocaleDateString('fr-FR', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </Dialog.Title>
-                  </Dialog.Header>
-                  <Dialog.CloseTrigger
-                    position="absolute"
-                    top="3"
-                    right="3"
-                    fontSize="xl"
-                    color="gray.400"
-                    _hover={{ color: 'gray.600' }}
-                  >
-                    ×
-                  </Dialog.CloseTrigger>
-                  <Dialog.Body>
-                    <Box display="flex" flexDirection="column" gap="3">
-                      {evenementsJourOuvert.length === 0 && (
-                        <Text fontSize="sm" color="gray.600">
-                          Aucun événement ce jour.
-                        </Text>
-                      )}
-                      {evenementsJourOuvert.map((e) => (
-                        <FicheEvenement
-                          key={e._id}
-                          evenement={e}
-                          estAdministrateur={estAdministrateur}
-                          onToggleValidation={toggleValidation}
-                          onValider={validerUnClic}
-                        />
-                      ))}
-                    </Box>
-                  </Dialog.Body>
-                </>
-              )}
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
-    </Box>
+      <Modal
+        open={!!jourSelectionne}
+        onCancel={() => setJourSelectionne(null)}
+        footer={null}
+        width={720}
+        title={
+          jourSelectionne
+            ? majusculeInitiale(
+                jourSelectionne.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+              )
+            : ''
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '65vh', overflowY: 'auto' }}>
+          {evenementsJourOuvert.length === 0 && <Text type="secondary">Aucun événement ce jour.</Text>}
+          {evenementsJourOuvert.map((e) => (
+            <FicheEvenement
+              key={e._id}
+              evenement={e}
+              estAdministrateur={estAdministrateur}
+              onToggleValidation={toggleValidation}
+              onValider={validerUnClic}
+            />
+          ))}
+        </div>
+      </Modal>
+    </div>
   );
 }

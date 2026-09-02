@@ -1,83 +1,76 @@
-import { NavLink, Navigate, Outlet } from 'react-router-dom';
-import { Badge, Box, Button, Container, Flex, HStack, Image, Text } from '@chakra-ui/react';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Button, Divider, Image, Layout, Menu, Space, Tag, Typography } from 'antd';
 import { useAuth } from '../context/AuthContext';
 import { LOGO_CUD, LOGO_DUNKERQUE } from '../logos';
 
-function NavItem({ to, end, children }: { to: string; end?: boolean; children: React.ReactNode }) {
-  return (
-    <NavLink to={to} end={end}>
-      {({ isActive }) => (
-        <Box
-          px="3"
-          py="2"
-          rounded="md"
-          fontSize="sm"
-          fontWeight="medium"
-          bg={isActive ? 'blue.600' : 'transparent'}
-          color={isActive ? 'white' : 'gray.600'}
-          _hover={{ bg: isActive ? 'blue.600' : 'gray.100' }}
-        >
-          {children}
-        </Box>
-      )}
-    </NavLink>
-  );
-}
+const { Header, Content } = Layout;
+const { Text } = Typography;
 
 export function AppLayout() {
   const { session, loading, estAdministrateur, deconnexion } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
-      <Flex h="100vh" align="center" justify="center" color="gray.500">
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', color: '#8c8c8c' }}>
         Chargement…
-      </Flex>
+      </div>
     );
   }
   if (!session) return <Navigate to="/connexion" replace />;
 
+  const items = [
+    { key: '/', label: 'Calendrier' },
+    { key: '/liste', label: 'Liste' },
+    ...(estAdministrateur
+      ? [
+          { key: '/comptes', label: 'Comptes' },
+          { key: '/demandes', label: "Demandes d'accès" },
+        ]
+      : []),
+  ];
+
   return (
-    <Box minH="100vh">
-      <Box borderBottomWidth="1px" borderColor="gray.200" bg="white">
-        <Container maxW="6xl" py="3">
-          <Flex align="center" justify="space-between">
-            <HStack gap="6">
-              <HStack gap="3">
-                <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" h="9" />
-                <Box h="8" w="1px" bg="gray.200" />
-                <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" h="9" />
-              </HStack>
-              <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                Calendrier Événements
-              </Text>
-              <HStack gap="1">
-                <NavItem to="/" end>
-                  Calendrier
-                </NavItem>
-                <NavItem to="/liste">Liste</NavItem>
-                {estAdministrateur && (
-                  <>
-                    <NavItem to="/comptes">Comptes</NavItem>
-                    <NavItem to="/demandes">Demandes d'accès</NavItem>
-                  </>
-                )}
-              </HStack>
-            </HStack>
-            <HStack gap="3">
-              {!estAdministrateur && <Badge colorPalette="blue">Consultation seule</Badge>}
-              <Text fontSize="sm" color="gray.600">
-                {session.nom}
-              </Text>
-              <Button variant="subtle" colorPalette="gray" onClick={() => deconnexion()}>
-                Déconnexion
-              </Button>
-            </HStack>
-          </Flex>
-        </Container>
-      </Box>
-      <Container maxW="6xl" py="6">
+    <Layout style={{ minHeight: '100vh' }}>
+      <Header
+        style={{
+          background: '#fff',
+          borderBottom: '1px solid #f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          height: 'auto',
+          lineHeight: 'normal',
+          padding: '10px 24px',
+        }}
+      >
+        <Space size="large" align="center">
+          <Space size="middle" align="center">
+            <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" height={36} preview={false} />
+            <Divider orientation="vertical" style={{ height: 32, margin: 0 }} />
+            <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" height={36} preview={false} />
+          </Space>
+          <Text strong style={{ fontSize: 18 }}>
+            Calendrier Événements
+          </Text>
+          <Menu
+            mode="horizontal"
+            selectedKeys={[location.pathname]}
+            items={items}
+            onClick={(e) => navigate(e.key)}
+            style={{ borderBottom: 'none', minWidth: 340 }}
+          />
+        </Space>
+        <Space>
+          {!estAdministrateur && <Tag color="blue">Consultation seule</Tag>}
+          <Text type="secondary">{session.nom}</Text>
+          <Button onClick={() => deconnexion()}>Déconnexion</Button>
+        </Space>
+      </Header>
+      <Content style={{ maxWidth: 1152, margin: '0 auto', width: '100%', padding: '24px' }}>
         <Outlet />
-      </Container>
-    </Box>
+      </Content>
+    </Layout>
   );
 }

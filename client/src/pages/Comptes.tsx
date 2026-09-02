@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Badge, Box, Button, Card, Field, HStack, Input, NativeSelect, Table, Text } from '@chakra-ui/react';
+import { Button, Card, Input, Select, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { api } from '../api';
 import type { Compte } from '../types';
 import { genererMotDePasse } from '../lib/generatePassword';
 import { formatDate } from '../lib/formatDate';
+
+const { Text } = Typography;
 
 export default function Comptes() {
   const [comptes, setComptes] = useState<Compte[]>([]);
@@ -66,101 +68,76 @@ export default function Comptes() {
 
   const badgeColor = (statut: string) => (statut === 'Suspendu' ? 'red' : statut === 'Actif' ? 'green' : 'orange');
 
-  return (
-    <Box display="flex" flexDirection="column" gap="6">
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Créer un compte</Card.Title>
-        </Card.Header>
-        <Card.Body>
-          {message && (
-            <Text mb="3" fontSize="sm" bg="blue.50" color="blue.800" px="3" py="2" rounded="md">
-              {message}
-            </Text>
-          )}
-          <HStack as="form" align="end" gap="3" wrap="wrap" onSubmit={creerCompte}>
-            <Field.Root minW="180px" flex="1">
-              <Field.Label fontSize="xs" color="gray.500">
-                Nom
-              </Field.Label>
-              <Input value={nom} onChange={(e) => setNom(e.target.value)} required />
-            </Field.Root>
-            <Field.Root minW="220px" flex="1">
-              <Field.Label fontSize="xs" color="gray.500">
-                Email
-              </Field.Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </Field.Root>
-            <Field.Root maxW="200px">
-              <Field.Label fontSize="xs" color="gray.500">
-                Rôle
-              </Field.Label>
-              <NativeSelect.Root>
-                <NativeSelect.Field value={role} onChange={(e) => setRole(e.target.value as 'Administrateur' | 'Consultant')}>
-                  <option value="Consultant">Consultant</option>
-                  <option value="Administrateur">Administrateur</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
-            <Button type="submit" colorPalette="blue" loading={envoi}>
-              Créer
-            </Button>
-          </HStack>
-        </Card.Body>
-      </Card.Root>
+  const columns: TableColumnsType<Compte> = [
+    { title: 'Nom', dataIndex: 'nom', key: 'nom', render: (v: string) => <Text strong>{v}</Text> },
+    { title: 'Email', dataIndex: 'email', key: 'email' },
+    { title: 'Rôle', dataIndex: 'role', key: 'role' },
+    { title: 'Statut', key: 'statut', render: (_, c) => <Tag color={badgeColor(c.statut)}>{c.statut}</Tag> },
+    { title: 'Dernière connexion', key: 'derniereConnexion', render: (_, c) => formatDate(c.derniereConnexion) },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, c) => (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button size="small" onClick={() => toggleStatut(c)}>
+            {c.statut === 'Suspendu' ? 'Activer' : 'Suspendre'}
+          </Button>
+          <Button size="small" onClick={() => reinitialiser(c)}>
+            Réinitialiser mot de passe
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
-      <Box overflowX="auto" borderWidth="1px" borderColor="gray.200" rounded="lg" bg="white">
-        <Table.Root size="sm">
-          <Table.Header bg="gray.100">
-            <Table.Row>
-              <Table.ColumnHeader fontSize="xs" textTransform="uppercase" color="gray.500">
-                Nom
-              </Table.ColumnHeader>
-              <Table.ColumnHeader fontSize="xs" textTransform="uppercase" color="gray.500">
-                Email
-              </Table.ColumnHeader>
-              <Table.ColumnHeader fontSize="xs" textTransform="uppercase" color="gray.500">
-                Rôle
-              </Table.ColumnHeader>
-              <Table.ColumnHeader fontSize="xs" textTransform="uppercase" color="gray.500">
-                Statut
-              </Table.ColumnHeader>
-              <Table.ColumnHeader fontSize="xs" textTransform="uppercase" color="gray.500">
-                Dernière connexion
-              </Table.ColumnHeader>
-              <Table.ColumnHeader fontSize="xs" textTransform="uppercase" color="gray.500">
-                Actions
-              </Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {comptes.map((c) => (
-              <Table.Row key={c._id}>
-                <Table.Cell fontWeight="medium" color="gray.700">
-                  {c.nom}
-                </Table.Cell>
-                <Table.Cell>{c.email}</Table.Cell>
-                <Table.Cell>{c.role}</Table.Cell>
-                <Table.Cell>
-                  <Badge colorPalette={badgeColor(c.statut)}>{c.statut}</Badge>
-                </Table.Cell>
-                <Table.Cell>{formatDate(c.derniereConnexion)}</Table.Cell>
-                <Table.Cell>
-                  <HStack gap="2">
-                    <Button size="xs" variant="subtle" colorPalette="gray" onClick={() => toggleStatut(c)}>
-                      {c.statut === 'Suspendu' ? 'Activer' : 'Suspendre'}
-                    </Button>
-                    <Button size="xs" variant="subtle" colorPalette="gray" onClick={() => reinitialiser(c)}>
-                      Réinitialiser mot de passe
-                    </Button>
-                  </HStack>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Box>
-    </Box>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <Card title="Créer un compte">
+        {message && (
+          <Text
+            style={{ display: 'block', marginBottom: 12, fontSize: 13, background: '#e6f4ff', color: '#0958d9', padding: '6px 12px', borderRadius: 6 }}
+          >
+            {message}
+          </Text>
+        )}
+        <form
+          onSubmit={creerCompte}
+          style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}
+        >
+          <div style={{ minWidth: 180, flex: 1 }}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Nom</div>
+            <Input value={nom} onChange={(e) => setNom(e.target.value)} required />
+          </div>
+          <div style={{ minWidth: 220, flex: 1 }}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Email</div>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div style={{ minWidth: 180 }}>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Rôle</div>
+            <Select
+              value={role}
+              onChange={(v) => setRole(v as 'Administrateur' | 'Consultant')}
+              style={{ width: '100%' }}
+              options={[
+                { value: 'Consultant', label: 'Consultant' },
+                { value: 'Administrateur', label: 'Administrateur' },
+              ]}
+            />
+          </div>
+          <Button type="primary" htmlType="submit" loading={envoi}>
+            Créer
+          </Button>
+        </form>
+      </Card>
+
+      <Table
+        rowKey="_id"
+        size="small"
+        bordered
+        columns={columns}
+        dataSource={comptes}
+        pagination={false}
+      />
+    </div>
   );
 }

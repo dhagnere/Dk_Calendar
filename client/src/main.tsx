@@ -1,7 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { ChakraProvider, defaultSystem } from '@chakra-ui/react';
+import { ConfigProvider } from 'antd';
+import frFR from 'antd/locale/fr_FR';
+import 'antd/dist/reset.css';
 import '@fontsource/inter/latin-400.css';
 import '@fontsource/inter/latin-500.css';
 import '@fontsource/inter/latin-600.css';
@@ -15,12 +17,20 @@ import { AuthProvider } from './context/AuthContext';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ChakraProvider value={defaultSystem}>
+    <ConfigProvider
+      locale={frFR}
+      theme={{
+        token: {
+          colorPrimary: '#1d4ed8',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        },
+      }}
+    >
       <BrowserRouter>
         <AuthProvider>
           <App />
         </AuthProvider>
       </BrowserRouter>
-    </ChakraProvider>
+    </ConfigProvider>
   </React.StrictMode>
 );
