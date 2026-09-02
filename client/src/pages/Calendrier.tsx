@@ -232,6 +232,9 @@ export default function Calendrier() {
                 onClick={() => setJourSelectionne(jour)}
                 style={{
                   minHeight: 140,
+                  minWidth: 0,
+                  width: '100%',
+                  overflow: 'hidden',
                   background: horsMois ? '#fafafa' : '#fff',
                   border: 'none',
                   borderRight: idx % 7 !== 6 ? `1px solid ${COULEUR_BORDURE}` : 'none',
@@ -254,12 +257,12 @@ export default function Calendrier() {
                 >
                   {jour.getDate()}
                 </span>
-                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                   {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => (
                     <div
                       key={e._id}
                       title={e.nom}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', minWidth: 0 }}
                     >
                       <Pastille couleur={couleurValidation(e)} />
                       <span
@@ -270,6 +273,8 @@ export default function Calendrier() {
                           fontSize: 11,
                           lineHeight: 1.4,
                           color: '#262626',
+                          flex: 1,
+                          minWidth: 0,
                         }}
                       >
                         {e.nom}
