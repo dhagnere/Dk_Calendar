@@ -3,14 +3,17 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Evenement } from '../types';
 import { Button } from '../components/ui/Button';
-import { ValidationBadge } from '../components/ValidationBadge';
+import { Dialog, DialogBody, DialogHeader } from '../components/ui/Dialog';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
+import { FicheEvenement } from '../components/FicheEvenement';
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MOIS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ];
+
+const MAX_LIGNES_VISIBLES = 4;
 
 function debutSemaine(date: Date): Date {
   const jour = (date.getDay() + 6) % 7; // 0 = lundi
@@ -24,11 +27,11 @@ function memeJour(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function pastilleClasse(e: Evenement): string {
-  if (e.validationTechnique && e.validationPolitique) return 'bg-purple-500';
-  if (e.validationTechnique) return 'bg-green-500';
-  if (e.validationPolitique) return 'bg-blue-500';
-  return 'bg-red-500';
+function chipClasse(e: Evenement): string {
+  if (e.validationTechnique && e.validationPolitique) return 'bg-purple-100 text-purple-800';
+  if (e.validationTechnique) return 'bg-green-100 text-green-800';
+  if (e.validationPolitique) return 'bg-blue-100 text-blue-800';
+  return 'bg-red-100 text-red-800';
 }
 
 export default function Calendrier() {
@@ -85,6 +88,13 @@ export default function Calendrier() {
     charger();
   };
 
+  const toggleValidation = async (id: string, champ: 'validationTechnique' | 'validationPolitique', valeur: boolean) => {
+    await api.post(`/evenements/${id}/validations`, { [champ]: valeur });
+    charger();
+  };
+
+  const evenementsJourOuvert = jourSelectionne ? evenementsDuJour(jourSelectionne) : [];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -135,61 +145,66 @@ export default function Calendrier() {
         {jours.map((jour) => {
           const evts = evenementsDuJour(jour);
           const horsMois = jour.getMonth() !== mois.getMonth();
+          const surplus = evts.length - MAX_LIGNES_VISIBLES;
           return (
             <button
               key={jour.toISOString()}
               onClick={() => setJourSelectionne(jour)}
-              className={`min-h-[84px] bg-white p-1.5 text-left align-top hover:bg-slate-50 ${horsMois ? 'text-slate-300' : 'text-slate-700'}`}
+              className={`min-h-[132px] bg-white p-1.5 text-left align-top hover:bg-slate-50 ${horsMois ? 'text-slate-300' : 'text-slate-700'}`}
             >
               <span className={`text-xs ${memeJour(jour, new Date()) ? 'rounded-full bg-primary px-1.5 py-0.5 text-white' : ''}`}>
                 {jour.getDate()}
               </span>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {evts.slice(0, 4).map((e) => (
-                  <span key={e._id} className={`h-2 w-2 rounded-full ${pastilleClasse(e)}`} title={e.nom} />
+              <div className="mt-1 space-y-0.5">
+                {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => (
+                  <div
+                    key={e._id}
+                    className={`truncate rounded px-1 py-[1px] text-[10px] leading-tight ${chipClasse(e)}`}
+                    title={e.nom}
+                  >
+                    {e.nom}
+                  </div>
                 ))}
-                {evts.length > 4 && <span className="text-[10px] text-slate-400">+{evts.length - 4}</span>}
+                {surplus > 0 && (
+                  <div className="truncate px-1 text-[10px] font-semibold text-slate-500">
+                    +{surplus} événement{surplus > 1 ? 's' : ''}
+                  </div>
+                )}
               </div>
             </button>
           );
         })}
       </div>
 
-      {jourSelectionne && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-700">
-              Événements du {jourSelectionne.toLocaleDateString('fr-FR')}
-            </h3>
-            <button className="text-sm text-slate-400 hover:text-slate-600" onClick={() => setJourSelectionne(null)}>
-              Fermer
-            </button>
-          </div>
-          <div className="space-y-2">
-            {evenementsDuJour(jourSelectionne).length === 0 && (
-              <p className="text-sm text-slate-400">Aucun événement ce jour.</p>
-            )}
-            {evenementsDuJour(jourSelectionne).map((e) => (
-              <div key={e._id} className="flex items-center justify-between rounded-md border border-slate-100 px-3 py-2">
-                <div>
-                  <p className="font-medium text-slate-700">{e.nom}</p>
-                  <p className="text-xs text-slate-500">
-                    {e.quartier} · {e.nature}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <ValidationBadge evenement={e} />
-                  {estAdministrateur && (
-                    <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => validerUnClic(e._id)}>
-                      Valider
-                    </Button>
-                  )}
-                </div>
+      <Dialog open={!!jourSelectionne} onClose={() => setJourSelectionne(null)}>
+        {jourSelectionne && (
+          <>
+            <DialogHeader
+              title={jourSelectionne.toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+              onClose={() => setJourSelectionne(null)}
+            />
+            <DialogBody>
+              <div className="space-y-3">
+                {evenementsJourOuvert.length === 0 && <p className="text-sm text-slate-400">Aucun événement ce jour.</p>}
+                {evenementsJourOuvert.map((e) => (
+                  <FicheEvenement
+                    key={e._id}
+                    evenement={e}
+                    estAdministrateur={estAdministrateur}
+                    onToggleValidation={toggleValidation}
+                    onValider={validerUnClic}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </DialogBody>
+          </>
+        )}
+      </Dialog>
     </div>
   );
 }

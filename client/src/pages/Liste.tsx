@@ -8,12 +8,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Checkbox } from '../components/ui/Checkbox';
-
-function formatDate(value: string | null): string {
-  if (!value) return '—';
-  const d = new Date(value);
-  return d.toLocaleDateString('fr-FR');
-}
+import { formatDate } from '../lib/formatDate';
 
 export default function Liste() {
   const { estAdministrateur } = useAuth();
