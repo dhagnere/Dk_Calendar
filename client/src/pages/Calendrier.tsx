@@ -62,6 +62,9 @@ export default function Calendrier() {
 
   const evenementsDuJour = (jour: Date) =>
     evenements.filter((e) => {
+      // Cas normal : la ligne représente précisément ce jour (dateClef).
+      if (e.dateClef) return memeJour(new Date(e.dateClef), jour);
+      // Repli pour un événement sans dateClef (ex: créé manuellement) : chevauchement de plage.
       if (!e.dateDeDebut) return false;
       const debut = new Date(e.dateDeDebut);
       const fin = e.dateDeFin ? new Date(e.dateDeFin) : debut;

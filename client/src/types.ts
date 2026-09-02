@@ -1,6 +1,9 @@
 export interface Evenement {
   _id: string;
   eventId?: string;
+  // Jour précis représenté par cette ligne ("Date Clef") : un événement de plusieurs jours a une
+  // ligne par jour occupé, toutes partageant le même nom/dateDeDebut/dateDeFin.
+  dateClef: string | null;
   nom: string;
   dateDeDebut: string | null;
   dateDeFin: string | null;

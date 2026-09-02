@@ -23,7 +23,7 @@ async function seedEvents(): Promise<void> {
   let created = 0;
   let updated = 0;
   for (const row of rows) {
-    const filter = row.eventId ? { eventId: row.eventId } : { nom: row.nom, dateDeDebut: row.dateDeDebut };
+    const filter = row.eventId ? { eventId: row.eventId } : { nom: row.nom, dateClef: row.dateClef };
     const result = await EventModel.updateOne(filter, { $set: row }, { upsert: true });
     if (result.upsertedCount > 0) created++;
     else updated++;

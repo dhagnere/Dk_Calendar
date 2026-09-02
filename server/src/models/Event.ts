@@ -4,6 +4,9 @@ const eventSchema = new Schema(
   {
     eventId: { type: String, index: true }, // identifiant lisible, ex: EVT-2026-0001
     nom: { type: String, required: true, index: true },
+    // Jour précis représenté par cette ligne ("Date Clef") : un événement de plusieurs jours a
+    // une ligne par jour occupé, toutes partageant le même nom/dateDeDebut/dateDeFin.
+    dateClef: { type: Date, default: null, index: true },
     dateDeDebut: { type: Date, default: null },
     dateDeFin: { type: Date, default: null },
     lieu: { type: String, default: '' },

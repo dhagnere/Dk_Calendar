@@ -141,6 +141,7 @@ export default function Liste() {
           <thead className="bg-slate-100 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-3 py-2">Nom</th>
+              <th className="px-3 py-2">Jour</th>
               <th className="px-3 py-2">Début</th>
               <th className="px-3 py-2">Fin</th>
               <th className="px-3 py-2">Quartier</th>
@@ -153,14 +154,14 @@ export default function Liste() {
           <tbody className="divide-y divide-slate-100">
             {chargement && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={9} className="px-3 py-6 text-center text-slate-400">
                   Chargement…
                 </td>
               </tr>
             )}
             {!chargement && evenements.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={9} className="px-3 py-6 text-center text-slate-400">
                   Aucun événement
                 </td>
               </tr>
@@ -168,6 +169,7 @@ export default function Liste() {
             {evenements.map((e) => (
               <tr key={e._id}>
                 <td className="px-3 py-2 font-medium text-slate-700">{e.nom}</td>
+                <td className="px-3 py-2">{formatDate(e.dateClef)}</td>
                 <td className="px-3 py-2">{formatDate(e.dateDeDebut)}</td>
                 <td className="px-3 py-2">{formatDate(e.dateDeFin)}</td>
                 <td className="px-3 py-2">{e.quartier}</td>

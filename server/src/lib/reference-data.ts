@@ -10,6 +10,7 @@ export const VALID_QUARTIERS = [
   'Fort-Mardyck',
   'Petite-Synthe',
   'Rosendaël',
+  'Saint-Pol-sur-Mer',
   'Dunkerque - Sud',
   'Agglomération',
   'Station Balnéaire',

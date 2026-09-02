@@ -15,7 +15,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 
 export const importRouter = Router();
 
-/** Importe (upsert) des événements depuis un fichier CSV. Upsert par eventId si présent, sinon par nom+dateDeDebut. */
+/**
+ * Importe (upsert) des événements depuis un fichier CSV. Un événement de plusieurs jours a une
+ * ligne par jour occupé (même nom, même dateDeDebut/dateDeFin, mais dateClef différente) : l'upsert
+ * se fait donc par eventId si présent, sinon par (nom, dateClef) pour ne pas écraser les autres jours.
+ */
 importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ ok: false, message: 'Aucun fichier reçu' });
@@ -28,7 +32,7 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
   let updated = 0;
 
   for (const row of rows) {
-    const filter = row.eventId ? { eventId: row.eventId } : { nom: row.nom, dateDeDebut: row.dateDeDebut };
+    const filter = row.eventId ? { eventId: row.eventId } : { nom: row.nom, dateClef: row.dateClef };
     const result = await EventModel.updateOne(filter, { $set: row }, { upsert: true });
     if (result.upsertedCount > 0) created++;
     else updated++;

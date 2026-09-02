@@ -4,6 +4,7 @@ import { stringify } from 'csv-stringify/sync';
 /** Colonnes du CSV des événements (correspondance directe avec le modèle Event). */
 export const EVENT_CSV_COLUMNS = [
   'eventId',
+  'dateClef',
   'nom',
   'dateDeDebut',
   'dateDeFin',
@@ -63,6 +64,7 @@ export function formatBoolFr(value: boolean | undefined | null): string {
 
 export interface EventCsvRow {
   eventId: string;
+  dateClef: Date | null;
   nom: string;
   dateDeDebut: Date | null;
   dateDeFin: Date | null;
@@ -103,6 +105,7 @@ export function parseEventsCsv(content: string): { rows: EventCsvRow[]; errors: 
     }
     rows.push({
       eventId: record.eventId?.trim() ?? '',
+      dateClef: parseDateFr(record.dateClef),
       nom,
       dateDeDebut: parseDateFr(record.dateDeDebut),
       dateDeFin: parseDateFr(record.dateDeFin),
@@ -130,6 +133,7 @@ export function parseEventsCsv(content: string): { rows: EventCsvRow[]; errors: 
 export function stringifyEventsCsv(
   events: Array<{
     eventId?: string | null;
+    dateClef?: Date | string | null;
     nom: string;
     dateDeDebut?: Date | string | null;
     dateDeFin?: Date | string | null;
@@ -152,6 +156,7 @@ export function stringifyEventsCsv(
 ): string {
   const rows = events.map((e) => ({
     eventId: e.eventId ?? '',
+    dateClef: formatDateFr(e.dateClef ?? null),
     nom: e.nom,
     dateDeDebut: formatDateFr(e.dateDeDebut ?? null),
     dateDeFin: formatDateFr(e.dateDeFin ?? null),
