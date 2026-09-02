@@ -11,6 +11,7 @@ export default function Login() {
   const [adminExiste, setAdminExiste] = useState<boolean | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
+  const [vue, setVue] = useState<'connexion' | 'demande'>('connexion');
 
   // Formulaire connexion
   const [email, setEmail] = useState('');
@@ -20,6 +21,12 @@ export default function Login() {
   const [nom, setNom] = useState('');
   const [emailAdmin, setEmailAdmin] = useState('');
   const [motDePasseAdmin, setMotDePasseAdmin] = useState('');
+
+  // Formulaire de demande d'accès (utilisateur sans compte)
+  const [nomDemande, setNomDemande] = useState('');
+  const [emailDemande, setEmailDemande] = useState('');
+  const [organisationDemande, setOrganisationDemande] = useState('');
+  const [motifDemande, setMotifDemande] = useState('');
 
   useEffect(() => {
     api
@@ -37,6 +44,30 @@ export default function Login() {
     try {
       const res = await connexion(email, motDePasse);
       if (!res.ok) setMessage(res.message);
+    } finally {
+      setEnvoi(false);
+    }
+  };
+
+  const soumettreDemandeAcces = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEnvoi(true);
+    setMessage(null);
+    try {
+      const res = await api.post<{ ok: boolean; message: string }>('/demandes-acces', {
+        nom: nomDemande,
+        email: emailDemande,
+        organisation: organisationDemande || undefined,
+        motif: motifDemande || undefined,
+      });
+      setMessage(res.message);
+      if (res.ok) {
+        setNomDemande('');
+        setEmailDemande('');
+        setOrganisationDemande('');
+        setMotifDemande('');
+        setVue('connexion');
+      }
     } finally {
       setEnvoi(false);
     }
@@ -68,7 +99,11 @@ export default function Login() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>
-            {adminExiste === false ? "Créer le compte administrateur" : 'Connexion — Calendrier Dunkerque'}
+            {adminExiste === false
+              ? 'Créer le compte administrateur'
+              : vue === 'demande'
+                ? 'Demander un accès'
+                : 'Connexion — Calendrier Dunkerque'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -100,26 +135,81 @@ export default function Login() {
             </form>
           )}
 
-          {adminExiste === true && (
-            <form className="space-y-3" onSubmit={soumettreConnexion}>
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Mot de passe"
-                value={motDePasse}
-                onChange={(e) => setMotDePasse(e.target.value)}
-                required
-              />
-              <Button type="submit" className="w-full" disabled={envoi}>
-                Se connecter
-              </Button>
-            </form>
+          {adminExiste === true && vue === 'connexion' && (
+            <>
+              <form className="space-y-3" onSubmit={soumettreConnexion}>
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Mot de passe"
+                  value={motDePasse}
+                  onChange={(e) => setMotDePasse(e.target.value)}
+                  required
+                />
+                <Button type="submit" className="w-full" disabled={envoi}>
+                  Se connecter
+                </Button>
+              </form>
+              <button
+                type="button"
+                className="mt-3 w-full text-center text-sm text-primary hover:underline"
+                onClick={() => {
+                  setMessage(null);
+                  setVue('demande');
+                }}
+              >
+                Pas encore de compte ? Demander un accès
+              </button>
+            </>
+          )}
+
+          {adminExiste === true && vue === 'demande' && (
+            <>
+              <form className="space-y-3" onSubmit={soumettreDemandeAcces}>
+                <Input
+                  placeholder="Nom complet"
+                  value={nomDemande}
+                  onChange={(e) => setNomDemande(e.target.value)}
+                  required
+                />
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={emailDemande}
+                  onChange={(e) => setEmailDemande(e.target.value)}
+                  required
+                />
+                <Input
+                  placeholder="Organisation (optionnel)"
+                  value={organisationDemande}
+                  onChange={(e) => setOrganisationDemande(e.target.value)}
+                />
+                <Input
+                  placeholder="Motif de la demande (optionnel)"
+                  value={motifDemande}
+                  onChange={(e) => setMotifDemande(e.target.value)}
+                />
+                <Button type="submit" className="w-full" disabled={envoi}>
+                  Envoyer la demande
+                </Button>
+              </form>
+              <button
+                type="button"
+                className="mt-3 w-full text-center text-sm text-slate-500 hover:underline"
+                onClick={() => {
+                  setMessage(null);
+                  setVue('connexion');
+                }}
+              >
+                ← Retour à la connexion
+              </button>
+            </>
           )}
         </CardContent>
       </Card>

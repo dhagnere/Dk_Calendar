@@ -33,3 +33,13 @@ export interface Compte {
 export function estValide(e: Pick<Evenement, 'validationTechnique' | 'validationPolitique'>): boolean {
   return e.validationTechnique && e.validationPolitique;
 }
+
+export interface DemandeAcces {
+  _id: string;
+  nom: string;
+  email: string;
+  organisation: string;
+  motif: string;
+  statut: 'En attente' | 'Approuvée' | 'Rejetée';
+  createdAt: string;
+}

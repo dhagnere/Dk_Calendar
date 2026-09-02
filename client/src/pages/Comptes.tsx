@@ -6,10 +6,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-
-function genererMotDePasse(): string {
-  return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 8).toUpperCase() + '!2';
-}
+import { genererMotDePasse } from '../lib/generatePassword';
 
 export default function Comptes() {
   const [comptes, setComptes] = useState<Compte[]>([]);

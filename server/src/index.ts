@@ -11,6 +11,7 @@ import { authRouter } from './routes/auth.routes.js';
 import { eventsRouter } from './routes/events.routes.js';
 import { accountsRouter } from './routes/accounts.routes.js';
 import { importRouter } from './routes/import.routes.js';
+import { accessRequestsRouter } from './routes/access-requests.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +29,7 @@ async function main() {
   app.use('/api/evenements', eventsRouter);
   app.use('/api/comptes', accountsRouter);
   app.use('/api/import', importRouter);
+  app.use('/api/demandes-acces', accessRequestsRouter);
 
   // En production, le build du client (client/dist) est servi directement par ce serveur.
   const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');

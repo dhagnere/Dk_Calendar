@@ -26,9 +26,14 @@ export function AppLayout() {
                 Liste
               </NavLink>
               {estAdministrateur && (
-                <NavLink to="/comptes" className={linkClass}>
-                  Comptes
-                </NavLink>
+                <>
+                  <NavLink to="/comptes" className={linkClass}>
+                    Comptes
+                  </NavLink>
+                  <NavLink to="/demandes" className={linkClass}>
+                    Demandes d'accès
+                  </NavLink>
+                </>
               )}
             </nav>
           </div>
