@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
-import { Badge, Box, Button, Container, Flex, HStack, Text } from '@chakra-ui/react';
+import { Badge, Box, Button, Container, Flex, HStack, Image, Text } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
+import { LOGO_CUD, LOGO_DUNKERQUE } from '../logos';
 
 function NavItem({ to, end, children }: { to: string; end?: boolean; children: React.ReactNode }) {
   return (
@@ -41,8 +42,13 @@ export function AppLayout() {
         <Container maxW="6xl" py="3">
           <Flex align="center" justify="space-between">
             <HStack gap="6">
+              <HStack gap="3">
+                <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" h="9" />
+                <Box h="8" w="1px" bg="gray.200" />
+                <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" h="9" />
+              </HStack>
               <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                📅 Calendrier Dunkerque
+                Calendrier Événements
               </Text>
               <HStack gap="1">
                 <NavItem to="/" end>

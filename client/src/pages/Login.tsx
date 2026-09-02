@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Box, Button, Card, Center, Input, Text } from '@chakra-ui/react';
+import { Box, Button, Card, Center, HStack, Image, Input, Text, VStack } from '@chakra-ui/react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { LOGO_CUD, LOGO_DUNKERQUE } from '../logos';
 
 export default function Login() {
   const { session, connexion } = useAuth();
@@ -94,7 +95,13 @@ export default function Login() {
 
   return (
     <Center minH="100vh" bg="gray.50" px="4">
-      <Card.Root w="full" maxW="sm">
+      <VStack gap="6" w="full" maxW="sm">
+        <HStack gap="4" justify="center">
+          <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" h="10" />
+          <Box h="9" w="1px" bg="gray.300" />
+          <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" h="10" />
+        </HStack>
+        <Card.Root w="full">
         <Card.Header>
           <Card.Title>
             {adminExiste === false
@@ -228,7 +235,8 @@ export default function Login() {
             </>
           )}
         </Card.Body>
-      </Card.Root>
+        </Card.Root>
+      </VStack>
     </Center>
   );
 }
