@@ -98,7 +98,7 @@ export default function Calendrier() {
           <Button variant="subtle" colorPalette="gray" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() - 1, 1))}>
             ←
           </Button>
-          <Heading size="md" w="48" textAlign="center" color="gray.700">
+          <Heading size="md" w="48" textAlign="center" color="gray.800">
             {MOIS[mois.getMonth()]} {mois.getFullYear()}
           </Heading>
           <Button variant="subtle" colorPalette="gray" onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() + 1, 1))}>
@@ -121,7 +121,7 @@ export default function Calendrier() {
             <Text fontSize="2xl" fontWeight="bold" color="gray.800">
               {stats.total}
             </Text>
-            <Text fontSize="xs" color="gray.500">
+            <Text fontSize="xs" color="gray.700">
               Total affiché
             </Text>
           </Box>
@@ -129,7 +129,7 @@ export default function Calendrier() {
             <Text fontSize="2xl" fontWeight="bold" color="green.600">
               {stats.validated}
             </Text>
-            <Text fontSize="xs" color="gray.500">
+            <Text fontSize="xs" color="gray.700">
               Validés
             </Text>
           </Box>
@@ -137,15 +137,15 @@ export default function Calendrier() {
             <Text fontSize="2xl" fontWeight="bold" color="orange.600">
               {stats.pending}
             </Text>
-            <Text fontSize="xs" color="gray.500">
+            <Text fontSize="xs" color="gray.700">
               En attente
             </Text>
           </Box>
         </SimpleGrid>
       )}
 
-      <HStack gap="4" mb="2" fontSize="xs" color="gray.500">
-        <Text fontWeight="medium" color="gray.600">
+      <HStack gap="4" mb="2" fontSize="xs" color="gray.700">
+        <Text fontWeight="medium" color="gray.800">
           Légende :
         </Text>
         <HStack gap="1.5">
@@ -160,7 +160,7 @@ export default function Calendrier() {
 
       <SimpleGrid columns={7} gap="1px" bg="gray.200" borderWidth="1px" borderColor="gray.200" rounded="lg" overflow="hidden">
         {JOURS.map((j) => (
-          <Box key={j} bg="gray.100" py="2" textAlign="center" fontSize="xs" fontWeight="semibold" color="gray.500">
+          <Box key={j} bg="gray.100" py="2" textAlign="center" fontSize="xs" fontWeight="semibold" color="gray.700">
             {j}
           </Box>
         ))}
@@ -178,7 +178,7 @@ export default function Calendrier() {
               bg="white"
               p="1.5"
               textAlign="left"
-              color={horsMois ? 'gray.300' : 'gray.700'}
+              color={horsMois ? 'gray.300' : 'gray.900'}
               _hover={{ bg: 'gray.50' }}
             >
               <Text
@@ -214,7 +214,7 @@ export default function Calendrier() {
                   );
                 })}
                 {surplus > 0 && (
-                  <Text fontSize="10px" fontWeight="semibold" color="gray.500">
+                  <Text fontSize="10px" fontWeight="semibold" color="gray.700">
                     +{surplus} événement{surplus > 1 ? 's' : ''}
                   </Text>
                 )}
@@ -254,7 +254,7 @@ export default function Calendrier() {
                   <Dialog.Body>
                     <Box display="flex" flexDirection="column" gap="3">
                       {evenementsJourOuvert.length === 0 && (
-                        <Text fontSize="sm" color="gray.400">
+                        <Text fontSize="sm" color="gray.600">
                           Aucun événement ce jour.
                         </Text>
                       )}
