@@ -68,7 +68,7 @@ export function AppLayout() {
           <Button onClick={() => deconnexion()}>Déconnexion</Button>
         </Space>
       </Header>
-      <Content style={{ maxWidth: 1152, margin: '0 auto', width: '100%', padding: '24px' }}>
+      <Content style={{ maxWidth: 1600, margin: '0 auto', width: '100%', padding: '24px' }}>
         <Outlet />
       </Content>
     </Layout>

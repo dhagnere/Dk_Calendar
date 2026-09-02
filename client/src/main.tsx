@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import frFR from 'antd/locale/fr_FR';
+import dayjs from 'dayjs';
+import 'dayjs/locale/fr';
 import 'antd/dist/reset.css';
+
+dayjs.locale('fr');
 import '@fontsource/inter/latin-400.css';
 import '@fontsource/inter/latin-500.css';
 import '@fontsource/inter/latin-600.css';

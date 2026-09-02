@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Col, Modal, Row, Typography } from 'antd';
+import dayjs from 'dayjs';
+import { Button, Card, Col, DatePicker, Modal, Row, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
@@ -15,6 +16,9 @@ const MOIS = [
 ];
 
 const MAX_LIGNES_VISIBLES = 4;
+const COULEUR_BORDURE = '#bfbfbf';
+const COULEUR_VALIDE = '#52c41a';
+const COULEUR_NON_VALIDE = '#ff4d4f';
 
 function debutSemaine(date: Date): Date {
   const jour = (date.getDay() + 6) % 7; // 0 = lundi
@@ -28,12 +32,48 @@ function memeJour(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function couleursChip(e: Evenement): { bg: string; color: string } {
-  return estValide(e) ? { bg: '#f6ffed', color: '#389e0d' } : { bg: '#fff1f0', color: '#cf1322' };
+function couleurValidation(e: Evenement): string {
+  return estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE;
 }
 
 function majusculeInitiale(texte: string): string {
   return texte.charAt(0).toUpperCase() + texte.slice(1);
+}
+
+/** Petite pastille de couleur placée devant le texte pour indiquer la validation. */
+function Pastille({ couleur }: { couleur: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        flexShrink: 0,
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        background: couleur,
+      }}
+    />
+  );
+}
+
+/** Groupe de contrôles encadré (boîte), utilisé pour la navigation et les actions. */
+function Boite({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+        border: `1px solid ${COULEUR_BORDURE}`,
+        borderRadius: 8,
+        padding: '8px 12px',
+        background: '#fff',
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 export default function Calendrier() {
@@ -100,23 +140,30 @@ export default function Calendrier() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Boite>
           <Button onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() - 1, 1))}>←</Button>
-          <Title level={4} style={{ width: 180, textAlign: 'center', margin: 0 }}>
+          <Title level={4} style={{ width: 170, textAlign: 'center', margin: 0 }}>
             {MOIS[mois.getMonth()]} {mois.getFullYear()}
           </Title>
           <Button onClick={() => setMois(new Date(mois.getFullYear(), mois.getMonth() + 1, 1))}>→</Button>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <DatePicker
+            picker="month"
+            value={dayjs(mois)}
+            onChange={(date) => date && setMois(date.toDate())}
+            allowClear={false}
+            format="MMMM YYYY"
+          />
+        </Boite>
+        <Boite>
           {estAdministrateur && <Button onClick={archiverPasses}>Archiver les événements passés</Button>}
           <ImportExportEvenements onImported={charger} />
-        </div>
+        </Boite>
       </div>
 
       {stats && (
         <Row gutter={12} style={{ marginBottom: 16 }}>
           <Col span={8}>
-            <Card size="small" style={{ textAlign: 'center' }}>
+            <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Total affiché
@@ -124,15 +171,15 @@ export default function Calendrier() {
             </Card>
           </Col>
           <Col span={8}>
-            <Card size="small" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: '#389e0d' }}>{stats.validated}</div>
+            <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: COULEUR_VALIDE }}>{stats.validated}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Validés
               </Text>
             </Card>
           </Col>
           <Col span={8}>
-            <Card size="small" style={{ textAlign: 'center' }}>
+            <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700, color: '#d46b08' }}>{stats.pending}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 En attente
@@ -147,21 +194,28 @@ export default function Calendrier() {
           Légende :
         </Text>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#f6ffed', border: '1px solid #b7eb8f' }} />
+          <Pastille couleur={COULEUR_VALIDE} />
           Validée
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: '#fff1f0', border: '1px solid #ffa39e' }} />
+          <Pastille couleur={COULEUR_NON_VALIDE} />
           Non validée
         </span>
       </div>
 
-      <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ border: `2px solid ${COULEUR_BORDURE}`, borderRadius: 8, overflow: 'hidden', width: '100%' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#fafafa' }}>
           {JOURS.map((j) => (
             <div
               key={j}
-              style={{ textAlign: 'center', padding: '8px 0', fontSize: 12, fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0' }}
+              style={{
+                textAlign: 'center',
+                padding: '10px 0',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#262626',
+                borderBottom: `2px solid ${COULEUR_BORDURE}`,
+              }}
             >
               {j}
             </div>
@@ -178,53 +232,53 @@ export default function Calendrier() {
                 key={jour.toISOString()}
                 onClick={() => setJourSelectionne(jour)}
                 style={{
-                  minHeight: 132,
-                  background: '#fff',
+                  minHeight: 140,
+                  background: horsMois ? '#fafafa' : '#fff',
                   border: 'none',
-                  borderRight: idx % 7 !== 6 ? '1px solid #f0f0f0' : 'none',
-                  borderBottom: '1px solid #f0f0f0',
+                  borderRight: idx % 7 !== 6 ? `1px solid ${COULEUR_BORDURE}` : 'none',
+                  borderBottom: `1px solid ${COULEUR_BORDURE}`,
                   textAlign: 'left',
-                  padding: 6,
+                  padding: 8,
                   cursor: 'pointer',
                   color: horsMois ? '#bfbfbf' : '#141414',
                 }}
               >
                 <span
                   style={{
-                    fontSize: 12,
+                    fontSize: 13,
+                    fontWeight: estAujourdhui ? 700 : 500,
                     borderRadius: 999,
-                    padding: estAujourdhui ? '2px 7px' : undefined,
+                    padding: estAujourdhui ? '2px 8px' : undefined,
                     background: estAujourdhui ? '#1d4ed8' : undefined,
                     color: estAujourdhui ? '#fff' : undefined,
                   }}
                 >
                   {jour.getDate()}
                 </span>
-                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => {
-                    const couleurs = couleursChip(e);
-                    return (
-                      <div
-                        key={e._id}
-                        title={e.nom}
+                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => (
+                    <div
+                      key={e._id}
+                      title={e.nom}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}
+                    >
+                      <Pastille couleur={couleurValidation(e)} />
+                      <span
                         style={{
                           overflow: 'hidden',
                           whiteSpace: 'nowrap',
                           textOverflow: 'ellipsis',
-                          borderRadius: 4,
-                          padding: '0 4px',
-                          fontSize: 10,
+                          fontSize: 11,
                           lineHeight: 1.4,
-                          background: couleurs.bg,
-                          color: couleurs.color,
+                          color: '#262626',
                         }}
                       >
                         {e.nom}
-                      </div>
-                    );
-                  })}
+                      </span>
+                    </div>
+                  ))}
                   {surplus > 0 && (
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#595959' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#595959' }}>
                       +{surplus} événement{surplus > 1 ? 's' : ''}
                     </div>
                   )}
