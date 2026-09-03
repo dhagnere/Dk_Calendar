@@ -10,6 +10,11 @@ const eventSchema = new Schema(
     dateDeDebut: { type: Date, default: null },
     dateDeFin: { type: Date, default: null },
     lieu: { type: String, default: '' },
+    // Coordonnées du lieu, obtenues par géocodage de `lieu` (voir server/src/lib/geocodage.ts).
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
+    // 'attente' (jamais tenté), 'ok' (géocodé), 'echec' (adresse non trouvée, ne pas retenter en boucle).
+    statutGeocodage: { type: String, default: 'attente' },
     quartier: { type: String, default: '' },
     pilote: { type: String, default: '' },
     directionPilote: { type: String, default: '' },
@@ -32,6 +37,7 @@ eventSchema.index({ quartier: 1 });
 eventSchema.index({ statut: 1 });
 eventSchema.index({ nature: 1 });
 eventSchema.index({ dateDeDebut: 1 });
+eventSchema.index({ statutGeocodage: 1 });
 
 export type EventDoc = InferSchemaType<typeof eventSchema>;
 export const EventModel = model('Event', eventSchema);

@@ -2,8 +2,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { EventModel } from '../models/Event.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { geocoderPlusieursAdresses } from '../lib/geocodage.js';
 
 export const eventsRouter = Router();
+
+/** Nombre d'adresses distinctes géocodées par appel à POST /evenements/geocoder (voir plus bas). */
+const LOT_GEOCODAGE = 10;
 
 /** Année à partir de laquelle les événements sont chargés par défaut (voir GET /evenements). */
 const ANNEE_PLANCHER_PAR_DEFAUT = 2024;
@@ -131,6 +135,55 @@ eventsRouter.get('/stats', async (_req, res) => {
     byStatut: byStatut.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
     byNature: byNature.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
   });
+});
+
+/**
+ * Géocode un lot d'événements en attente (statutGeocodage: 'attente'), pour la page Carte.
+ * Nominatim (le service de géocodage gratuit utilisé) impose 1 requête par seconde : un seul appel
+ * ne traite donc qu'un nombre limité d'adresses distinctes (LOT_GEOCODAGE) pour rester dans le délai
+ * d'une requête HTTP. Le client rappelle cette route en boucle jusqu'à ce que `restants` soit à 0.
+ * Les adresses partagées par plusieurs événements (un même lieu) ne sont géocodées qu'une fois.
+ */
+eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
+  try {
+    // Un événement sans lieu du tout ne pourra jamais être géocodé : on l'écarte tout de suite.
+    await EventModel.updateMany(
+      { statutGeocodage: 'attente', $or: [{ lieu: null }, { lieu: '' }] },
+      { statutGeocodage: 'echec' }
+    );
+
+    const enAttente = await EventModel.find({ statutGeocodage: 'attente' }, { lieu: 1 }).lean();
+    const adressesDistinctes = [...new Set(enAttente.map((e) => e.lieu.trim()))].slice(0, LOT_GEOCODAGE);
+
+    let geocodes = 0;
+    let echecs = 0;
+
+    if (adressesDistinctes.length > 0) {
+      const resultats = await geocoderPlusieursAdresses(adressesDistinctes);
+      for (const [adresse, coords] of resultats) {
+        if (coords) {
+          await EventModel.updateMany(
+            { lieu: adresse, statutGeocodage: 'attente' },
+            { latitude: coords.latitude, longitude: coords.longitude, statutGeocodage: 'ok' }
+          );
+          geocodes++;
+        } else {
+          await EventModel.updateMany({ lieu: adresse, statutGeocodage: 'attente' }, { statutGeocodage: 'echec' });
+          echecs++;
+        }
+      }
+    }
+
+    const restants = await EventModel.countDocuments({ statutGeocodage: 'attente' });
+    console.log(`[geocodage] ${geocodes} adresse(s) géocodée(s), ${echecs} échec(s), ${restants} événement(s) restant(s)`);
+    res.json({ ok: true, geocodes, echecs, restants });
+  } catch (err) {
+    console.error('[geocodage] Échec :', err);
+    res.status(500).json({
+      ok: false,
+      message: `Échec du géocodage : ${err instanceof Error ? err.message : 'erreur inconnue'}`,
+    });
+  }
 });
 
 /** Supprime un événement (utile notamment pour nettoyer un doublon créé par un import antérieur). */

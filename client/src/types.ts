@@ -8,6 +8,9 @@ export interface Evenement {
   dateDeDebut: string | null;
   dateDeFin: string | null;
   lieu: string;
+  latitude: number | null;
+  longitude: number | null;
+  statutGeocodage: 'attente' | 'ok' | 'echec';
   quartier: string;
   pilote: string;
   directionPilote: string;
