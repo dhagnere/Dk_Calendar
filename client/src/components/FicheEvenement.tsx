@@ -16,7 +16,6 @@ interface Props {
 export function FicheEvenement({ evenement, estAdministrateur, onToggleValidation, onValider }: Props) {
   const items = [
     { key: 'lieu', label: 'Lieu', children: evenement.lieu || '—' },
-    { key: 'statut', label: 'Statut', children: evenement.statut || '—' },
     { key: 'pilote', label: 'Pilote', children: evenement.pilote || '—' },
     { key: 'direction', label: 'Direction pilote', children: evenement.directionPilote || '—' },
     { key: 'organisateur', label: 'Organisateur', children: evenement.organisateur || '—' },

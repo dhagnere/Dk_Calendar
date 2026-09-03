@@ -161,7 +161,6 @@ export default function Liste() {
     },
     { title: 'Quartier', key: 'quartier', width: 150, render: (e) => e.quartier },
     { title: 'Nature', key: 'nature', width: 130, render: (e) => e.nature },
-    { title: 'Statut', key: 'statut', width: 110, render: (e) => e.statut },
     { title: 'Validation', key: 'validation', width: 130, render: (e) => <ValidationBadge evenement={e} /> },
     ...(estAdministrateur
       ? [

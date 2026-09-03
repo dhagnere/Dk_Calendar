@@ -110,6 +110,7 @@ export default function Calendrier() {
   const [mois, setMois] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [jourSelectionne, setJourSelectionne] = useState<Date | null>(null);
+  const [genererPdfEnCours, setGenererPdfEnCours] = useState(false);
   const [stats, setStats] = useState<{
     total: number;
     validated: number;
@@ -191,6 +192,16 @@ export default function Calendrier() {
   };
 
   const evenementsJourOuvert = jourSelectionne ? evenementsDuJour(jourSelectionne) : [];
+
+  const telechargerFichePdf = async () => {
+    if (!jourSelectionne) return;
+    setGenererPdfEnCours(true);
+    try {
+      await exporterFicheJourPdf(jourSelectionne, evenementsJourOuvert);
+    } finally {
+      setGenererPdfEnCours(false);
+    }
+  };
 
   return (
     <div>
@@ -419,11 +430,7 @@ export default function Calendrier() {
         open={!!jourSelectionne}
         onCancel={() => setJourSelectionne(null)}
         footer={[
-          <Button
-            key="pdf"
-            icon={<FilePdfOutlined />}
-            onClick={() => jourSelectionne && exporterFicheJourPdf(jourSelectionne, evenementsJourOuvert)}
-          >
+          <Button key="pdf" icon={<FilePdfOutlined />} loading={genererPdfEnCours} onClick={telechargerFichePdf}>
             Télécharger en PDF
           </Button>,
         ]}

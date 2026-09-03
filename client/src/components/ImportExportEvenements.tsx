@@ -8,7 +8,7 @@ import { useGeocodage } from '../context/GeocodageContext';
 interface Props {
   onImported: () => void;
   /** Si fourni, affiche un bouton « Exporter PDF » (visible de tous, consultation comprise). */
-  onExporterPdf?: () => void;
+  onExporterPdf?: () => void | Promise<void>;
 }
 
 /**
@@ -21,10 +21,21 @@ export function ImportExportEvenements({ onImported, onExporterPdf }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
+  const [enCoursPdf, setEnCoursPdf] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const exporterCsv = () => {
     window.open('/api/import/evenements/export', '_blank');
+  };
+
+  const cliquerExporterPdf = async () => {
+    if (!onExporterPdf) return;
+    setEnCoursPdf(true);
+    try {
+      await onExporterPdf();
+    } finally {
+      setEnCoursPdf(false);
+    }
   };
 
   const importerCsv = async (fichier: File) => {
@@ -63,7 +74,7 @@ export function ImportExportEvenements({ onImported, onExporterPdf }: Props) {
           Exporter CSV
         </Button>
         {onExporterPdf && (
-          <Button icon={<FilePdfOutlined />} onClick={onExporterPdf}>
+          <Button icon={<FilePdfOutlined />} loading={enCoursPdf} onClick={cliquerExporterPdf}>
             Exporter PDF
           </Button>
         )}

@@ -4,9 +4,11 @@ import { estValide, type Evenement } from '../types';
 import { formatTitreEvenement } from './formatTitre';
 import { formatDate, majusculeInitiale } from './formatDate';
 import { formatDuree } from './formatDuree';
+import { chargerLogosPourPdf, type LogosPdf } from './logosPdf';
 
 const TITRE_APP = 'Calendrier Événements Dunkerque';
 const MARGE = 40;
+const HAUTEUR_LOGO = 30;
 
 /**
  * jspdf-autotable pose `finalY` sur `doc.lastAutoTable` en effet de bord (non typé dans ses .d.ts,
@@ -17,28 +19,55 @@ function finalYDe(doc: jsPDF): number {
   return (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? MARGE;
 }
 
-function entete(doc: jsPDF, sousTitre: string): void {
+/** En-tête commun : logos officiels, titre de l'app, sous-titre, et date/heure d'impression. */
+function entete(doc: jsPDF, sousTitre: string, logos: LogosPdf): number {
+  const largeurPage = doc.internal.pageSize.getWidth();
+  let xTexte = MARGE;
+
+  for (const logo of [logos.dunkerque, logos.cud]) {
+    if (!logo) continue;
+    const largeurLogo = HAUTEUR_LOGO * (logo.largeur / logo.hauteur || 1);
+    doc.addImage(logo.dataUrl, 'PNG', xTexte, MARGE - 22, largeurLogo, HAUTEUR_LOGO);
+    xTexte += largeurLogo + 12;
+  }
+
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(TITRE_APP, MARGE, MARGE);
+  doc.text(TITRE_APP, xTexte, MARGE - 4);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
-  doc.text(sousTitre, MARGE, MARGE + 20);
+  doc.text(sousTitre, xTexte, MARGE + 16);
+
+  const maintenant = new Date();
+  const texteImpression = `Imprimé le ${maintenant.toLocaleDateString('fr-FR')} à ${maintenant.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
+  doc.setFontSize(9);
+  doc.setTextColor(140);
+  doc.text(texteImpression, largeurPage - MARGE, MARGE - 22, { align: 'right' });
+  doc.setTextColor(0);
+
+  const yLigne = MARGE + 26;
+  doc.setDrawColor(220);
+  doc.line(MARGE, yLigne, largeurPage - MARGE, yLigne);
+
+  return yLigne + 20;
 }
 
 /**
  * Exporte en PDF les fiches détaillées de tous les événements d'un jour donné (une fiche par
  * événement, avec ses champs comme dans la pop-up du Calendrier), utile pour imprimer la journée.
  */
-export function exporterFicheJourPdf(jour: Date, evenements: Evenement[]): void {
+export async function exporterFicheJourPdf(jour: Date, evenements: Evenement[]): Promise<void> {
+  const logos = await chargerLogosPourPdf();
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const largeurPage = doc.internal.pageSize.getWidth();
 
   const titreJour = majusculeInitiale(
     jour.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   );
-  entete(doc, titreJour);
-  let y = MARGE + 40;
+  let y = entete(doc, titreJour, logos);
 
   if (evenements.length === 0) {
     doc.setFontSize(11);
@@ -71,7 +100,6 @@ export function exporterFicheJourPdf(jour: Date, evenements: Evenement[]): void 
         ['Lieu', e.lieu || '—'],
         ['Quartier', e.quartier || '—'],
         ['Nature', e.nature || '—'],
-        ['Statut', e.statut || '—'],
         ['Pilote', e.pilote || '—'],
         ['Direction pilote', e.directionPilote || '—'],
         ['Organisateur', e.organisateur || '—'],
@@ -90,17 +118,23 @@ export function exporterFicheJourPdf(jour: Date, evenements: Evenement[]): void 
 export type LigneExportPdf = { type: 'entete'; label: string } | { type: 'evenement'; evenement: Evenement };
 
 /** Exporte en PDF la Liste telle qu'affichée à l'écran (mêmes filtres, mêmes en-têtes de semaine). */
-export function exporterListePdf(lignes: LigneExportPdf[]): void {
+export async function exporterListePdf(lignes: LigneExportPdf[]): Promise<void> {
+  const logos = await chargerLogosPourPdf();
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
-  entete(doc, 'Liste des événements');
+  const y = entete(doc, 'Liste des événements', logos);
 
   const body = lignes.map((ligne) => {
     if (ligne.type === 'entete') {
       return [
         {
           content: ligne.label,
-          colSpan: 6,
-          styles: { fillColor: [230, 244, 255] as [number, number, number], textColor: [25, 88, 217] as [number, number, number], fontStyle: 'bold' as const, halign: 'left' as const },
+          colSpan: 5,
+          styles: {
+            fillColor: [230, 244, 255] as [number, number, number],
+            textColor: [25, 88, 217] as [number, number, number],
+            fontStyle: 'bold' as const,
+            halign: 'left' as const,
+          },
         },
       ];
     }
@@ -109,18 +143,17 @@ export function exporterListePdf(lignes: LigneExportPdf[]): void {
       formatTitreEvenement(e.nom),
       e.quartier || '—',
       e.nature || '—',
-      e.statut || '—',
       estValide(e) ? 'Validée' : 'Non validée',
       formatDuree(e) ?? formatDate(e.dateDeDebut),
     ];
   });
 
   autoTable(doc, {
-    startY: MARGE + 36,
+    startY: y,
     margin: { left: MARGE, right: MARGE },
     styles: { fontSize: 9 },
     headStyles: { fillColor: [29, 78, 216] },
-    head: [['Nom', 'Quartier', 'Nature', 'Statut', 'Validation', 'Période']],
+    head: [['Nom', 'Quartier', 'Nature', 'Validation', 'Période']],
     body,
   });
 
