@@ -175,7 +175,7 @@ export default function Liste() {
         columns={columns}
         dataSource={evenements}
         loading={chargement}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
+        pagination={{ pageSize: 50, showSizeChanger: false }}
         bordered
         locale={{ emptyText: 'Aucun événement' }}
       />
