@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Button, Checkbox, Input, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { api } from '../api';
@@ -9,6 +9,11 @@ import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { formatDate } from '../lib/formatDate';
 
 const { Text } = Typography;
+
+const MOIS_FR = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+];
 
 /** Texte de durée affiché sous le nom d'un événement, ex. "du 12/07/2026 au 15/07/2026". */
 function formatDuree(e: Evenement): string | null {
@@ -31,6 +36,68 @@ function regrouperParEvenement(evenements: Evenement[]): Evenement[] {
     if (!parCle.has(cle)) parCle.set(cle, e);
   }
   return [...parCle.values()];
+}
+
+/** Début (lundi) de la semaine contenant `date`. */
+function debutSemaine(date: Date): Date {
+  const jour = (date.getDay() + 6) % 7; // 0 = lundi
+  const d = new Date(date);
+  d.setDate(d.getDate() - jour);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Fin (dimanche) de la semaine dont `debut` est le lundi. */
+function finSemaine(debut: Date): Date {
+  const d = new Date(debut);
+  d.setDate(d.getDate() + 6);
+  return d;
+}
+
+/** Ex. "Semaine du 01 janvier au 07 janvier 2026 inclus". */
+function formatSemaine(debut: Date, fin: Date): string {
+  const jour = (d: Date) => String(d.getDate()).padStart(2, '0');
+  const anneeDebut = debut.getFullYear() !== fin.getFullYear() ? ` ${debut.getFullYear()}` : '';
+  return `Semaine du ${jour(debut)} ${MOIS_FR[debut.getMonth()]}${anneeDebut} au ${jour(fin)} ${MOIS_FR[fin.getMonth()]} ${fin.getFullYear()} inclus`;
+}
+
+type LigneListe =
+  | { type: 'entete'; key: string; label: string }
+  | { type: 'evenement'; key: string; evenement: Evenement };
+
+/**
+ * Regroupe les événements par semaine (lundi à dimanche) de leur dateDeDebut (dateClef en repli),
+ * du plus ancien au plus récent, avec une ligne d'en-tête avant chaque semaine. Les événements sans
+ * aucune date sont placés dans un dernier groupe « Sans date planifiée ».
+ */
+function regrouperParSemaine(evenements: Evenement[]): LigneListe[] {
+  const avecDate = evenements.filter((e) => e.dateDeDebut || e.dateClef);
+  const sansDate = evenements.filter((e) => !e.dateDeDebut && !e.dateClef);
+
+  const trie = [...avecDate].sort((a, b) => {
+    const da = new Date((a.dateDeDebut ?? a.dateClef)!).getTime();
+    const db = new Date((b.dateDeDebut ?? b.dateClef)!).getTime();
+    return da - db;
+  });
+
+  const lignes: LigneListe[] = [];
+  let cleSemaineCourante: string | null = null;
+  for (const e of trie) {
+    const debut = debutSemaine(new Date((e.dateDeDebut ?? e.dateClef)!));
+    const cle = debut.toISOString();
+    if (cle !== cleSemaineCourante) {
+      cleSemaineCourante = cle;
+      lignes.push({ type: 'entete', key: `entete-${cle}`, label: formatSemaine(debut, finSemaine(debut)) });
+    }
+    lignes.push({ type: 'evenement', key: e._id, evenement: e });
+  }
+
+  if (sansDate.length > 0) {
+    lignes.push({ type: 'entete', key: 'entete-sans-date', label: 'Sans date planifiée' });
+    for (const e of sansDate) lignes.push({ type: 'evenement', key: e._id, evenement: e });
+  }
+
+  return lignes;
 }
 
 export default function Liste() {
@@ -94,30 +161,30 @@ export default function Liste() {
 
   const evenementsGroupes = useMemo(() => regrouperParEvenement(evenements), [evenements]);
   const total = evenementsGroupes.length;
+  const lignes = useMemo(() => regrouperParSemaine(evenementsGroupes), [evenementsGroupes]);
 
-  const columns: TableColumnsType<Evenement> = [
+  /** Colonnes « normales », appliquées uniquement aux lignes de type événement. */
+  const colonnesEvenement: { title: string; key: string; render: (e: Evenement) => ReactNode }[] = [
     {
       title: 'Nom',
       key: 'nom',
-      render: (_, e) => (
+      render: (e) => (
         <div>
           <Text strong>{e.nom}</Text>
-          {formatDuree(e) && (
-            <div style={{ fontSize: 12, color: '#8c8c8c' }}>{formatDuree(e)}</div>
-          )}
+          {formatDuree(e) && <div style={{ fontSize: 12, color: '#8c8c8c' }}>{formatDuree(e)}</div>}
         </div>
       ),
     },
-    { title: 'Quartier', dataIndex: 'quartier', key: 'quartier' },
-    { title: 'Nature', dataIndex: 'nature', key: 'nature' },
-    { title: 'Statut', dataIndex: 'statut', key: 'statut' },
-    { title: 'Validation', key: 'validation', render: (_, e) => <ValidationBadge evenement={e} /> },
+    { title: 'Quartier', key: 'quartier', render: (e) => e.quartier },
+    { title: 'Nature', key: 'nature', render: (e) => e.nature },
+    { title: 'Statut', key: 'statut', render: (e) => e.statut },
+    { title: 'Validation', key: 'validation', render: (e) => <ValidationBadge evenement={e} /> },
     ...(estAdministrateur
       ? [
           {
             title: 'Actions',
             key: 'actions',
-            render: (_: unknown, e: Evenement) => (
+            render: (e: Evenement) => (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
                 <Checkbox
                   checked={e.validationTechnique}
@@ -150,6 +217,30 @@ export default function Liste() {
         ]
       : []),
   ];
+
+  /**
+   * Les colonnes réelles de la Table : sur une ligne d'en-tête de semaine, la première colonne
+   * fusionne toute la largeur (colSpan) pour afficher le libellé de la semaine, les autres colonnes
+   * sont fusionnées dedans (colSpan: 0), technique standard d'antd pour des lignes de séparation.
+   */
+  const columns: TableColumnsType<LigneListe> = colonnesEvenement.map((col, index) => ({
+    title: col.title,
+    key: col.key,
+    onCell: (ligne: LigneListe) => {
+      if (ligne.type !== 'entete') return {};
+      return index === 0 ? { colSpan: colonnesEvenement.length, style: { background: '#fafafa' } } : { colSpan: 0 };
+    },
+    render: (_: unknown, ligne: LigneListe) => {
+      if (ligne.type === 'entete') {
+        return index === 0 ? (
+          <Text strong style={{ fontSize: 13 }}>
+            {ligne.label}
+          </Text>
+        ) : null;
+      }
+      return col.render(ligne.evenement);
+    },
+  }));
 
   return (
     <div>
@@ -202,12 +293,12 @@ export default function Liste() {
       </Text>
 
       <Table
-        rowKey="_id"
+        rowKey="key"
         size="small"
         columns={columns}
-        dataSource={evenementsGroupes}
+        dataSource={lignes}
         loading={chargement}
-        pagination={{ pageSize: 50, showSizeChanger: false }}
+        pagination={false}
         bordered
         locale={{ emptyText: 'Aucun événement' }}
       />
