@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, Input, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { api } from '../api';
@@ -9,6 +9,29 @@ import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { formatDate } from '../lib/formatDate';
 
 const { Text } = Typography;
+
+/** Texte de durée affiché sous le nom d'un événement, ex. "du 12/07/2026 au 15/07/2026". */
+function formatDuree(e: Evenement): string | null {
+  if (!e.dateDeDebut) return null;
+  const debut = formatDate(e.dateDeDebut);
+  const fin = e.dateDeFin ? formatDate(e.dateDeFin) : null;
+  if (!fin || fin === debut) return debut;
+  return `du ${debut} au ${fin}`;
+}
+
+/**
+ * Un événement sur plusieurs jours a une ligne par jour occupé (dateClef), toutes partageant le
+ * même nom/dateDeDebut/dateDeFin. Pour la liste, on ne veut plus qu'une seule ligne par événement :
+ * on regroupe donc par (nom, dateDeDebut, dateDeFin) et on ne garde qu'une ligne représentative.
+ */
+function regrouperParEvenement(evenements: Evenement[]): Evenement[] {
+  const parCle = new Map<string, Evenement>();
+  for (const e of evenements) {
+    const cle = `${e.nom}|${e.dateDeDebut ?? ''}|${e.dateDeFin ?? ''}`;
+    if (!parCle.has(cle)) parCle.set(cle, e);
+  }
+  return [...parCle.values()];
+}
 
 export default function Liste() {
   const { estAdministrateur } = useAuth();
@@ -69,13 +92,22 @@ export default function Liste() {
     charger();
   };
 
-  const total = evenements.length;
+  const evenementsGroupes = useMemo(() => regrouperParEvenement(evenements), [evenements]);
+  const total = evenementsGroupes.length;
 
   const columns: TableColumnsType<Evenement> = [
-    { title: 'Nom', dataIndex: 'nom', key: 'nom', render: (v: string) => <Text strong>{v}</Text> },
-    { title: 'Jour', key: 'jour', render: (_, e) => formatDate(e.dateClef) },
-    { title: 'Début', key: 'debut', render: (_, e) => formatDate(e.dateDeDebut) },
-    { title: 'Fin', key: 'fin', render: (_, e) => formatDate(e.dateDeFin) },
+    {
+      title: 'Nom',
+      key: 'nom',
+      render: (_, e) => (
+        <div>
+          <Text strong>{e.nom}</Text>
+          {formatDuree(e) && (
+            <div style={{ fontSize: 12, color: '#8c8c8c' }}>{formatDuree(e)}</div>
+          )}
+        </div>
+      ),
+    },
     { title: 'Quartier', dataIndex: 'quartier', key: 'quartier' },
     { title: 'Nature', dataIndex: 'nature', key: 'nature' },
     { title: 'Statut', dataIndex: 'statut', key: 'statut' },
@@ -173,7 +205,7 @@ export default function Liste() {
         rowKey="_id"
         size="small"
         columns={columns}
-        dataSource={evenements}
+        dataSource={evenementsGroupes}
         loading={chargement}
         pagination={{ pageSize: 50, showSizeChanger: false }}
         bordered

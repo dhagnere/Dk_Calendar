@@ -165,7 +165,19 @@ eventsRouter.post('/:id/statut', requireAdmin, async (req, res) => {
   res.json({ ok: true, item: updated });
 });
 
-/** Met à jour les validations (technique / politique). */
+/**
+ * Filtre identifiant tous les jours d'un même événement multi-jours : même nom et mêmes
+ * dateDeDebut/dateDeFin (seule dateClef diffère d'une ligne à l'autre pour un tel événement).
+ */
+function filtreSerie(e: { nom: string; dateDeDebut?: Date | null; dateDeFin?: Date | null }) {
+  return { nom: e.nom, dateDeDebut: e.dateDeDebut ?? null, dateDeFin: e.dateDeFin ?? null };
+}
+
+/**
+ * Met à jour les validations (technique / politique). Un événement sur plusieurs jours ayant une
+ * ligne par jour (dateClef), la validation d'un seul jour est répercutée sur toute la série pour que
+ * tous les jours affichent le même état.
+ */
 eventsRouter.post('/:id/validations', requireAdmin, async (req, res) => {
   const schema = z.object({ validationTechnique: z.boolean().optional(), validationPolitique: z.boolean().optional() });
   const parsed = schema.safeParse(req.body);
@@ -173,11 +185,13 @@ eventsRouter.post('/:id/validations', requireAdmin, async (req, res) => {
     res.status(400).json({ ok: false, message: 'Données invalides' });
     return;
   }
-  const updated = await EventModel.findByIdAndUpdate(req.params.id, parsed.data, { new: true });
-  if (!updated) {
+  const cible = await EventModel.findById(req.params.id);
+  if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
+  await EventModel.updateMany(filtreSerie(cible), parsed.data);
+  const updated = await EventModel.findById(req.params.id);
   res.json({ ok: true, item: updated });
 });
 
@@ -205,45 +219,22 @@ eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
 });
 
 /**
- * Valide un événement en un clic : statut "Validée" + les deux validations cochées.
+ * Valide un événement en un clic : statut "Validée" + les deux validations cochées. Répercuté sur
+ * toute la série (voir filtreSerie) pour qu'un événement sur plusieurs jours soit validé d'un bloc.
  */
 eventsRouter.post('/:id/valider', requireAdmin, async (req, res) => {
   const viaPastilleDateClef = z.boolean().optional().parse(req.body?.viaPastilleDateClef);
-  const updated = await EventModel.findByIdAndUpdate(
-    req.params.id,
-    {
-      statut: 'Validée',
-      validationTechnique: true,
-      validationPolitique: true,
-      validParDateClef: viaPastilleDateClef ?? false,
-    },
-    { new: true }
-  );
-  if (!updated) {
+  const cible = await EventModel.findById(req.params.id);
+  if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
+  await EventModel.updateMany(filtreSerie(cible), {
+    statut: 'Validée',
+    validationTechnique: true,
+    validationPolitique: true,
+    validParDateClef: viaPastilleDateClef ?? false,
+  });
+  const updated = await EventModel.findById(req.params.id);
   res.json({ ok: true, item: updated });
-});
-
-/** Valide toute une série d'événements partageant le même nom exact. */
-eventsRouter.post('/valider-serie', requireAdmin, async (req, res) => {
-  const schema = z.object({ eventName: z.string().min(1), viaPastilleDateClef: z.boolean().optional() });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ ok: false, message: 'Données invalides' });
-    return;
-  }
-
-  const result = await EventModel.updateMany(
-    { nom: parsed.data.eventName },
-    {
-      statut: 'Validée',
-      validationTechnique: true,
-      validationPolitique: true,
-      validParDateClef: parsed.data.viaPastilleDateClef ?? false,
-    }
-  );
-
-  res.json({ ok: true, validated: result.modifiedCount, total: result.matchedCount });
 });
