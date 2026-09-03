@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Divider, Image, Layout, Space, Tag, Typography } from 'antd';
 import {
   CalendarOutlined,
+  EnvironmentOutlined,
   TeamOutlined,
   UnorderedListOutlined,
   UserAddOutlined,
@@ -64,6 +65,7 @@ export function AppLayout() {
   const items = [
     { key: '/', label: 'Calendrier', icone: <CalendarOutlined /> },
     { key: '/liste', label: 'Liste', icone: <UnorderedListOutlined /> },
+    { key: '/carte', label: 'Carte', icone: <EnvironmentOutlined /> },
     ...(estAdministrateur
       ? [
           { key: '/comptes', label: 'Comptes', icone: <TeamOutlined /> },
