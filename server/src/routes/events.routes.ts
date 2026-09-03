@@ -138,7 +138,16 @@ eventsRouter.get('/stats', async (_req, res) => {
 });
 
 /**
- * Géocode un lot d'événements en attente (statutGeocodage: 'attente'), pour la page Carte.
+ * Filtre correspondant à « pas encore géocodé ». Attention : ajouter un champ avec une valeur par
+ * défaut au schéma ne l'ajoute PAS rétroactivement aux documents déjà en base — un événement créé
+ * avant ce champ n'a donc pas statutGeocodage: 'attente' mais littéralement AUCUN champ
+ * statutGeocodage. `{ statutGeocodage: 'attente' }` ne les trouverait donc jamais : il faut aussi
+ * accepter le champ absent, d'où $nin plutôt qu'une égalité stricte sur 'attente'.
+ */
+const NON_GEOCODE = { statutGeocodage: { $nin: ['ok', 'echec'] } };
+
+/**
+ * Géocode un lot d'événements en attente, pour la page Carte.
  * Nominatim (le service de géocodage gratuit utilisé) impose 1 requête par seconde : un seul appel
  * ne traite donc qu'un nombre limité d'adresses distinctes (LOT_GEOCODAGE) pour rester dans le délai
  * d'une requête HTTP. Le client rappelle cette route en boucle jusqu'à ce que `restants` soit à 0.
@@ -147,12 +156,9 @@ eventsRouter.get('/stats', async (_req, res) => {
 eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
   try {
     // Un événement sans lieu du tout ne pourra jamais être géocodé : on l'écarte tout de suite.
-    await EventModel.updateMany(
-      { statutGeocodage: 'attente', $or: [{ lieu: null }, { lieu: '' }] },
-      { statutGeocodage: 'echec' }
-    );
+    await EventModel.updateMany({ ...NON_GEOCODE, $or: [{ lieu: null }, { lieu: '' }] }, { statutGeocodage: 'echec' });
 
-    const enAttente = await EventModel.find({ statutGeocodage: 'attente' }, { lieu: 1 }).lean();
+    const enAttente = await EventModel.find(NON_GEOCODE, { lieu: 1 }).lean();
     const adressesDistinctes = [...new Set(enAttente.map((e) => e.lieu.trim()))].slice(0, LOT_GEOCODAGE);
 
     let geocodes = 0;
@@ -163,18 +169,18 @@ eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
       for (const [adresse, coords] of resultats) {
         if (coords) {
           await EventModel.updateMany(
-            { lieu: adresse, statutGeocodage: 'attente' },
+            { lieu: adresse, ...NON_GEOCODE },
             { latitude: coords.latitude, longitude: coords.longitude, statutGeocodage: 'ok' }
           );
           geocodes++;
         } else {
-          await EventModel.updateMany({ lieu: adresse, statutGeocodage: 'attente' }, { statutGeocodage: 'echec' });
+          await EventModel.updateMany({ lieu: adresse, ...NON_GEOCODE }, { statutGeocodage: 'echec' });
           echecs++;
         }
       }
     }
 
-    const restants = await EventModel.countDocuments({ statutGeocodage: 'attente' });
+    const restants = await EventModel.countDocuments(NON_GEOCODE);
     console.log(`[geocodage] ${geocodes} adresse(s) géocodée(s), ${echecs} échec(s), ${restants} événement(s) restant(s)`);
     res.json({ ok: true, geocodes, echecs, restants });
   } catch (err) {
