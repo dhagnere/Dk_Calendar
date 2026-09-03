@@ -17,6 +17,7 @@ export default function Liste() {
   const [recherche, setRecherche] = useState('');
   const [quartier, setQuartier] = useState('ALL');
   const [statut, setStatut] = useState('ALL');
+  const [avecEvenementsPasses, setAvecEvenementsPasses] = useState(false);
   const [options, setOptions] = useState<{ quartiers: { label: string }[]; statuts: { label: string }[] }>({
     quartiers: [],
     statuts: [],
@@ -29,6 +30,7 @@ export default function Liste() {
       if (recherche) params.set('searchTerm', recherche);
       if (quartier !== 'ALL') params.set('quartier', quartier);
       if (statut !== 'ALL') params.set('statut', statut);
+      if (avecEvenementsPasses) params.set('avecEvenementsPasses', 'true');
       const data = await api.get<{ items: Evenement[] }>(`/evenements?${params.toString()}`);
       setEvenements(data.items);
     } finally {
@@ -48,7 +50,7 @@ export default function Liste() {
     const t = setTimeout(charger, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recherche, quartier, statut]);
+  }, [recherche, quartier, statut, avecEvenementsPasses]);
 
   const toggleValidation = async (id: string, champ: 'validationTechnique' | 'validationPolitique', valeur: boolean) => {
     await api.post(`/evenements/${id}/validations`, { [champ]: valeur });
@@ -144,6 +146,12 @@ export default function Liste() {
             ]}
           />
         </div>
+        <Button
+          type={avecEvenementsPasses ? 'primary' : 'default'}
+          onClick={() => setAvecEvenementsPasses((v) => !v)}
+        >
+          {avecEvenementsPasses ? 'Masquer les événements passés' : 'Afficher les événements passés'}
+        </Button>
         <div style={{ marginLeft: 'auto' }}>
           <ImportExportEvenements onImported={charger} />
         </div>

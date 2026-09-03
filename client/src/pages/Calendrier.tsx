@@ -117,6 +117,7 @@ export default function Calendrier() {
   const [quartier, setQuartier] = useState('ALL');
   const [statut, setStatut] = useState('ALL');
   const [type, setType] = useState('ALL');
+  const [avecEvenementsPasses, setAvecEvenementsPasses] = useState(false);
   const [options, setOptions] = useState<OptionsFiltres>({ quartiers: [], statuts: [], types: [] });
 
   const charger = async () => {
@@ -124,6 +125,7 @@ export default function Calendrier() {
     if (quartier !== 'ALL') params.set('quartier', quartier);
     if (statut !== 'ALL') params.set('statut', statut);
     if (type !== 'ALL') params.set('type', type);
+    if (avecEvenementsPasses) params.set('avecEvenementsPasses', 'true');
     const data = await api.get<{ items: Evenement[] }>(`/evenements?${params.toString()}`);
     setEvenements(data.items);
     const s = await api.get<{
@@ -144,7 +146,7 @@ export default function Calendrier() {
   useEffect(() => {
     charger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quartier, statut, type]);
+  }, [quartier, statut, type, avecEvenementsPasses]);
 
   const jours = useMemo(() => {
     const premier = new Date(mois.getFullYear(), mois.getMonth(), 1);
@@ -236,6 +238,12 @@ export default function Calendrier() {
               ...options.statuts.map((s) => ({ value: s.label, label: s.label })),
             ]}
           />
+          <Button
+            type={avecEvenementsPasses ? 'primary' : 'default'}
+            onClick={() => setAvecEvenementsPasses((v) => !v)}
+          >
+            {avecEvenementsPasses ? 'Masquer les événements passés' : 'Afficher les événements passés'}
+          </Button>
         </Boite>
       </div>
 

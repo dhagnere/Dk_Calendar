@@ -5,9 +5,23 @@ import { requireAdmin } from '../middleware/auth.js';
 
 export const eventsRouter = Router();
 
-/** Liste des événements, avec filtres optionnels (quartier, statut, nature, type, recherche). */
+/** Année à partir de laquelle les événements sont chargés par défaut (voir GET /evenements). */
+const ANNEE_PLANCHER_PAR_DEFAUT = 2024;
+
+/**
+ * Liste des événements, avec filtres optionnels (quartier, statut, nature, type, recherche).
+ *
+ * Par souci de rapidité, seuls les événements entre le 1er janvier ANNEE_PLANCHER_PAR_DEFAUT et le
+ * 31 décembre de l'année suivant l'année en cours sont renvoyés par défaut. Passer
+ * `avecEvenementsPasses=true` retire cette borne basse pour inclure aussi tout l'historique
+ * antérieur (bouton « Afficher les événements passés » côté client). Un événement sans aucune date
+ * (ni dateDeDebut ni dateClef) est toujours renvoyé, quel que soit ce paramètre.
+ */
 eventsRouter.get('/', async (req, res) => {
-  const { quartier, statut, nature, type, searchTerm } = req.query as Record<string, string | undefined>;
+  const { quartier, statut, nature, type, searchTerm, avecEvenementsPasses } = req.query as Record<
+    string,
+    string | undefined
+  >;
 
   const filter: Record<string, unknown> = {};
   if (quartier && quartier !== 'ALL') filter.quartier = quartier;
@@ -24,6 +38,13 @@ eventsRouter.get('/', async (req, res) => {
     filter.statut = statut;
   }
 
+  const anneeActuelle = new Date().getFullYear();
+  const finPeriode = new Date(anneeActuelle + 2, 0, 1); // borne haute exclusive : fin de l'année en cours + 1 an
+  const contraintesDate: Record<string, unknown> = { $lt: finPeriode };
+  if (avecEvenementsPasses !== 'true') {
+    contraintesDate.$gte = new Date(ANNEE_PLANCHER_PAR_DEFAUT, 0, 1);
+  }
+
   // Trie par proximité avec aujourd'hui décroissante : l'événement dont la dateDeDebut (ou dateClef
   // en repli) est la plus proche de la date du jour arrive en premier, puis on s'éloigne
   // progressivement (dans le passé comme dans le futur) vers l'événement le plus lointain. Les
@@ -32,6 +53,7 @@ eventsRouter.get('/', async (req, res) => {
   const items = await EventModel.aggregate([
     { $match: filter },
     { $addFields: { dateTri: { $ifNull: ['$dateDeDebut', '$dateClef'] } } },
+    { $match: { $or: [{ dateTri: null }, { dateTri: contraintesDate }] } },
     { $addFields: { dateTriAbsente: { $cond: [{ $eq: ['$dateTri', null] }, 1, 0] } } },
     {
       $addFields: {
