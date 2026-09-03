@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react';
 import { Button, Space, Typography } from 'antd';
 import { UploadOutlined, DownloadOutlined } from '@ant-design/icons';
-import { api } from '../api';
+import { api, ApiError } from '../api';
 import { useAuth } from '../context/AuthContext';
 
 /** Boutons d'export CSV (tout le monde) et d'import CSV (admin uniquement), avec message de résultat. */
 export function ImportExportEvenements({ onImported }: { onImported: () => void }) {
   const { estAdministrateur } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -18,6 +19,7 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
   const importerCsv = async (fichier: File) => {
     setEnCours(true);
     setMessage(null);
+    setErreur(null);
     try {
       const form = new FormData();
       form.append('fichier', fichier);
@@ -25,10 +27,14 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
         '/import/evenements',
         form
       );
-      setMessage(
-        `${res.created} créé(s), ${res.doublons} doublon(s) ignoré(s) (déjà présents, non modifiés), ${res.errors.length} ligne(s) ignorée(s)`
-      );
+      let texte = `${res.created} créé(s), ${res.doublons} doublon(s) ignoré(s) (déjà présents, non modifiés), ${res.errors.length} ligne(s) ignorée(s)`;
+      if (res.errors.length > 0) {
+        texte += ` : ${res.errors.slice(0, 5).join(' ; ')}${res.errors.length > 5 ? '…' : ''}`;
+      }
+      setMessage(texte);
       onImported();
+    } catch (err) {
+      setErreur(err instanceof ApiError ? err.message : "Échec de l'import : impossible de contacter le serveur.");
     } finally {
       setEnCours(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -59,6 +65,11 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
       {message && (
         <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0, background: '#e6f4ff', color: '#0958d9', padding: '6px 12px', borderRadius: 6 }}>
           {message}
+        </Typography.Paragraph>
+      )}
+      {erreur && (
+        <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0, background: '#fff1f0', color: '#cf1322', padding: '6px 12px', borderRadius: 6 }}>
+          {erreur}
         </Typography.Paragraph>
       )}
     </div>
