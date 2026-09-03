@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
-import { Button, Card, Col, DatePicker, Modal, Row, Typography } from 'antd';
+import { Button, Card, Col, DatePicker, Modal, Row, Select, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
@@ -75,23 +75,62 @@ function Boite({ children }: { children: React.ReactNode }) {
   );
 }
 
+type OptionsFiltres = {
+  quartiers: { label: string }[];
+  statuts: { label: string }[];
+  types: { label: string }[];
+};
+
+/** Menu déroulant de filtre avec une petite étiquette au-dessus, utilisé dans la barre du calendrier. */
+function FiltreSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div style={{ minWidth: 170 }}>
+      <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>{label}</div>
+      <Select value={value} onChange={onChange} style={{ width: '100%' }} options={options} />
+    </div>
+  );
+}
+
 export default function Calendrier() {
   const { estAdministrateur } = useAuth();
   const [mois, setMois] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [jourSelectionne, setJourSelectionne] = useState<Date | null>(null);
   const [stats, setStats] = useState<{ total: number; validated: number; pending: number } | null>(null);
+  const [quartier, setQuartier] = useState('ALL');
+  const [statut, setStatut] = useState('ALL');
+  const [type, setType] = useState('ALL');
+  const [options, setOptions] = useState<OptionsFiltres>({ quartiers: [], statuts: [], types: [] });
 
   const charger = async () => {
-    const data = await api.get<{ items: Evenement[] }>('/evenements');
+    const params = new URLSearchParams();
+    if (quartier !== 'ALL') params.set('quartier', quartier);
+    if (statut !== 'ALL') params.set('statut', statut);
+    if (type !== 'ALL') params.set('type', type);
+    const data = await api.get<{ items: Evenement[] }>(`/evenements?${params.toString()}`);
     setEvenements(data.items);
     const s = await api.get<{ total: number; validated: number; pending: number }>('/evenements/stats');
     setStats(s);
   };
 
   useEffect(() => {
-    charger();
+    api.get<OptionsFiltres>('/evenements/options-filtres').then(setOptions);
   }, []);
+
+  useEffect(() => {
+    charger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quartier, statut, type]);
 
   const jours = useMemo(() => {
     const premier = new Date(mois.getFullYear(), mois.getMonth(), 1);
@@ -156,6 +195,33 @@ export default function Calendrier() {
         <Boite>
           {estAdministrateur && <Button onClick={archiverPasses}>Archiver les événements passés</Button>}
           <ImportExportEvenements onImported={charger} />
+        </Boite>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <Boite>
+          <FiltreSelect
+            label="Type"
+            value={type}
+            onChange={setType}
+            options={[{ value: 'ALL', label: 'Tous' }, ...options.types.map((t) => ({ value: t.label, label: t.label }))]}
+          />
+          <FiltreSelect
+            label="Quartier"
+            value={quartier}
+            onChange={setQuartier}
+            options={[{ value: 'ALL', label: 'Tous' }, ...options.quartiers.map((q) => ({ value: q.label, label: q.label }))]}
+          />
+          <FiltreSelect
+            label="Statut"
+            value={statut}
+            onChange={setStatut}
+            options={[
+              { value: 'ALL', label: 'Tous' },
+              { value: 'Validée', label: 'Validée' },
+              ...options.statuts.map((s) => ({ value: s.label, label: s.label })),
+            ]}
+          />
         </Boite>
       </div>
 

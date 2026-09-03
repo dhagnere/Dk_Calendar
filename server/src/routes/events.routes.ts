@@ -5,13 +5,14 @@ import { requireAdmin } from '../middleware/auth.js';
 
 export const eventsRouter = Router();
 
-/** Liste des événements, avec filtres optionnels (quartier, statut, nature, recherche). */
+/** Liste des événements, avec filtres optionnels (quartier, statut, nature, type, recherche). */
 eventsRouter.get('/', async (req, res) => {
-  const { quartier, statut, nature, searchTerm } = req.query as Record<string, string | undefined>;
+  const { quartier, statut, nature, type, searchTerm } = req.query as Record<string, string | undefined>;
 
   const filter: Record<string, unknown> = {};
   if (quartier && quartier !== 'ALL') filter.quartier = quartier;
   if (nature && nature !== 'ALL') filter.nature = nature;
+  if (type && type !== 'ALL') filter.type = type;
   if (searchTerm && searchTerm.trim().length > 0) {
     filter.nom = { $regex: searchTerm.trim(), $options: 'i' };
   }
@@ -27,18 +28,19 @@ eventsRouter.get('/', async (req, res) => {
   res.json({ items });
 });
 
-/** Options disponibles pour les filtres (quartiers/natures/statuts avec comptage). */
+/** Options disponibles pour les filtres (quartiers/natures/statuts/types avec comptage). */
 eventsRouter.get('/options-filtres', async (_req, res) => {
-  const [quartiers, natures, statuts] = await Promise.all([
+  const [quartiers, natures, statuts, types] = await Promise.all([
     EventModel.aggregate([{ $group: { _id: '$quartier', count: { $sum: 1 } } }]),
     EventModel.aggregate([{ $group: { _id: '$nature', count: { $sum: 1 } } }]),
     EventModel.aggregate([{ $group: { _id: '$statut', count: { $sum: 1 } } }]),
+    EventModel.aggregate([{ $group: { _id: '$type', count: { $sum: 1 } } }]),
   ]);
 
   const format = (rows: { _id: string; count: number }[]) =>
     rows.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count }));
 
-  res.json({ quartiers: format(quartiers), natures: format(natures), statuts: format(statuts) });
+  res.json({ quartiers: format(quartiers), natures: format(natures), statuts: format(statuts), types: format(types) });
 });
 
 /** Statistiques KPI (total, validés, en attente). */
