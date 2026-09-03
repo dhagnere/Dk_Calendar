@@ -228,12 +228,12 @@ export default function Liste() {
     key: col.key,
     onCell: (ligne: LigneListe) => {
       if (ligne.type !== 'entete') return {};
-      return index === 0 ? { colSpan: colonnesEvenement.length, style: { background: '#fafafa' } } : { colSpan: 0 };
+      return index === 0 ? { colSpan: colonnesEvenement.length, style: { background: '#e6f4ff' } } : { colSpan: 0 };
     },
     render: (_: unknown, ligne: LigneListe) => {
       if (ligne.type === 'entete') {
         return index === 0 ? (
-          <Text strong style={{ fontSize: 13 }}>
+          <Text strong style={{ fontSize: 13, color: '#1958d9' }}>
             {ligne.label}
           </Text>
         ) : null;
