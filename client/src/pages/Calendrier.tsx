@@ -7,6 +7,7 @@ import { estValide, type Evenement } from '../types';
 import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { FicheEvenement } from '../components/FicheEvenement';
+import { formatTitreEvenement } from '../lib/formatTitre';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -382,7 +383,7 @@ export default function Calendrier() {
                     {evts.slice(0, maxLignes).map((e) => (
                       <div
                         key={e._id}
-                        title={e.nom}
+                        title={formatTitreEvenement(e.nom)}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', minWidth: 0 }}
                       >
                         <Pastille couleur={couleurValidation(e)} />
@@ -398,7 +399,7 @@ export default function Calendrier() {
                             minWidth: 0,
                           }}
                         >
-                          {e.nom}
+                          {formatTitreEvenement(e.nom)}
                         </span>
                       </div>
                     ))}

@@ -1,6 +1,7 @@
 import { Button, Card, Checkbox, Descriptions, Typography } from 'antd';
 import { estValide, type Evenement } from '../types';
 import { formatDate } from '../lib/formatDate';
+import { formatTitreEvenement } from '../lib/formatTitre';
 import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ValidationBadge } from './ValidationBadge';
 
@@ -40,7 +41,7 @@ export function FicheEvenement({ evenement, estAdministrateur, onToggleValidatio
       style={{ borderWidth: 2, borderColor: couleurBordure }}
       title={
         <div>
-          <Typography.Text strong>{evenement.nom}</Typography.Text>
+          <Typography.Text strong>{formatTitreEvenement(evenement.nom)}</Typography.Text>
           <div style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 'normal' }}>
             {[evenement.quartier, evenement.nature, evenement.niveau].filter(Boolean).join(' · ')}
           </div>

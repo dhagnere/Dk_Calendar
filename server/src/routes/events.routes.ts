@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { EventModel } from '../models/Event.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { LIMITES_CUD, geocoderPlusieursAdresses } from '../lib/geocodage.js';
+import { motifRechercheInsensibleAccents } from '../lib/rechercheAccents.js';
 
 export const eventsRouter = Router();
 
@@ -48,7 +49,8 @@ eventsRouter.get('/', async (req, res) => {
   if (nature && nature !== 'ALL') filter.nature = nature;
   if (type && type !== 'ALL') filter.type = type;
   if (searchTerm && searchTerm.trim().length > 0) {
-    filter.nom = { $regex: searchTerm.trim(), $options: 'i' };
+    // Insensible à la casse ET aux accents (« evenement » retrouve aussi bien « Événement »).
+    filter.nom = { $regex: motifRechercheInsensibleAccents(searchTerm.trim()), $options: 'i' };
   }
 
   if (statut === 'Validée') {

@@ -8,6 +8,7 @@ import { ValidationBadge } from '../components/ValidationBadge';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
 import { formatDuree } from '../lib/formatDuree';
+import { formatTitreEvenement } from '../lib/formatTitre';
 
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -152,7 +153,7 @@ export default function Liste() {
       width: 220,
       render: (e) => (
         <div>
-          <Text strong>{e.nom}</Text>
+          <Text strong>{formatTitreEvenement(e.nom)}</Text>
           {formatDuree(e) && <div style={{ fontSize: 12, color: '#8c8c8c' }}>{formatDuree(e)}</div>}
         </div>
       ),
