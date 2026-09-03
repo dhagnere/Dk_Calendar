@@ -98,24 +98,27 @@ eventsRouter.get('/options-filtres', async (_req, res) => {
   res.json({ quartiers: format(quartiers), natures: format(natures), statuts: format(statuts), types: format(types) });
 });
 
-/** Statistiques KPI (total, validés, en attente, année en cours, depuis 2020). */
+/** Année à partir de laquelle porte le KPI "Total des manifestations" (voir GET /evenements/stats). */
+const ANNEE_PLANCHER_TOTAL_KPI = 2015;
+
+/** Statistiques KPI (total depuis 2015, validés, en attente, année en cours). */
 eventsRouter.get('/stats', async (_req, res) => {
   // Date de référence d'un événement pour le comptage par année : dateDeDebut si présente, sinon dateClef.
   const dateReference = { $ifNull: ['$dateDeDebut', '$dateClef'] };
   const anneeActuelle = new Date().getFullYear();
   const debutAnneeActuelle = new Date(anneeActuelle, 0, 1);
   const debutAnneeSuivante = new Date(anneeActuelle + 1, 0, 1);
-  const debut2020 = new Date(2020, 0, 1);
+  const debutPlancherTotal = new Date(ANNEE_PLANCHER_TOTAL_KPI, 0, 1);
+  const depuis2015: Record<string, unknown> = { $expr: { $gte: [dateReference, debutPlancherTotal] } };
 
-  const [total, validated, byStatut, byNature, anneeEnCours, depuis2020] = await Promise.all([
-    EventModel.countDocuments({}),
-    EventModel.countDocuments({ validationTechnique: true, validationPolitique: true }),
+  const [total, validated, byStatut, byNature, anneeEnCours] = await Promise.all([
+    EventModel.countDocuments(depuis2015),
+    EventModel.countDocuments({ ...depuis2015, validationTechnique: true, validationPolitique: true }),
     EventModel.aggregate([{ $group: { _id: '$statut', count: { $sum: 1 } } }]),
     EventModel.aggregate([{ $group: { _id: '$nature', count: { $sum: 1 } } }]),
     EventModel.countDocuments({
       $expr: { $and: [{ $gte: [dateReference, debutAnneeActuelle] }, { $lt: [dateReference, debutAnneeSuivante] }] },
     }),
-    EventModel.countDocuments({ $expr: { $gte: [dateReference, debut2020] } }),
   ]);
 
   res.json({
@@ -124,7 +127,7 @@ eventsRouter.get('/stats', async (_req, res) => {
     pending: total - validated,
     anneeActuelle,
     anneeEnCours,
-    depuis2020,
+    anneePlancherTotal: ANNEE_PLANCHER_TOTAL_KPI,
     byStatut: byStatut.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
     byNature: byNature.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
   });

@@ -112,7 +112,7 @@ export default function Calendrier() {
     pending: number;
     anneeActuelle: number;
     anneeEnCours: number;
-    depuis2020: number;
+    anneePlancherTotal: number;
   } | null>(null);
   const [quartier, setQuartier] = useState('ALL');
   const [statut, setStatut] = useState('ALL');
@@ -136,7 +136,7 @@ export default function Calendrier() {
       pending: number;
       anneeActuelle: number;
       anneeEnCours: number;
-      depuis2020: number;
+      anneePlancherTotal: number;
     }>('/evenements/stats');
     setStats(s);
   };
@@ -251,15 +251,15 @@ export default function Calendrier() {
 
       {stats && (
         <Row gutter={12} style={{ marginBottom: 16 }}>
-          <Col span={8}>
+          <Col span={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Total affiché
+                Total des manifestations depuis {stats.anneePlancherTotal}
               </Text>
             </Card>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700, color: COULEUR_VALIDE }}>{stats.validated}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -267,7 +267,7 @@ export default function Calendrier() {
               </Text>
             </Card>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700, color: '#d46b08' }}>{stats.pending}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -275,24 +275,11 @@ export default function Calendrier() {
               </Text>
             </Card>
           </Col>
-        </Row>
-      )}
-
-      {stats && (
-        <Row gutter={12} style={{ marginBottom: 16 }}>
-          <Col span={12}>
+          <Col span={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.anneeEnCours}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Manifestations en {stats.anneeActuelle}
-              </Text>
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.depuis2020}</div>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Total des événements depuis 2020
               </Text>
             </Card>
           </Col>
