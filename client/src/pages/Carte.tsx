@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { Alert, Button, Select, Space, Typography } from 'antd';
+import { Alert, Button, Select, Slider, Space, Typography } from 'antd';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ import type { Evenement } from '../types';
 import { estValide } from '../types';
 import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { formatDate } from '../lib/formatDate';
+import { regrouperParEvenement } from '../lib/regrouperEvenements';
 
 const { Text, Title } = Typography;
 
@@ -51,21 +52,81 @@ function regrouperParLieu(evenements: Evenement[]): LieuGeolocalise[] {
   return [...parLieu.values()];
 }
 
-/** Recentre la carte quand le lieu sélectionné change. */
-function RecentrageCarte({ lieu }: { lieu: LieuGeolocalise | null }) {
+/** Recentre/cadre la carte selon le nombre de lieux affichés après filtrage. */
+function RecentrageCarte({ lieux }: { lieux: LieuGeolocalise[] }) {
   const map = useMap();
   useEffect(() => {
-    if (lieu) map.flyTo([lieu.latitude, lieu.longitude], 16);
-    else map.flyTo(CENTRE_DUNKERQUE, 12);
-  }, [lieu, map]);
+    if (lieux.length === 0) {
+      map.flyTo(CENTRE_DUNKERQUE, 12);
+    } else if (lieux.length === 1) {
+      map.flyTo([lieux[0].latitude, lieux[0].longitude], 16);
+    } else {
+      const limites = L.latLngBounds(lieux.map((l) => [l.latitude, l.longitude] as [number, number]));
+      map.flyToBounds(limites, { padding: [40, 40], maxZoom: 15 });
+    }
+  }, [lieux, map]);
   return null;
+}
+
+type PasSlider = 'JOUR' | 'SEMAINE' | 'MOIS' | 'TRIMESTRE' | 'ANNEE' | 'TOUTES';
+
+const ETAPES_SLIDER: { valeur: PasSlider; label: string; labelCourt: string }[] = [
+  { valeur: 'JOUR', label: 'Jour', labelCourt: 'Jour' },
+  { valeur: 'SEMAINE', label: 'Semaine', labelCourt: 'Semaine' },
+  { valeur: 'MOIS', label: 'Mois', labelCourt: 'Mois' },
+  { valeur: 'TRIMESTRE', label: 'Trimestre', labelCourt: 'Trimestre' },
+  { valeur: 'ANNEE', label: 'Année', labelCourt: 'Année' },
+  { valeur: 'TOUTES', label: 'Toutes les dates', labelCourt: 'Toutes' },
+];
+
+/** Borne de fin de la fenêtre d'affichage, `null` pour « Toutes les dates » (pas de filtrage). */
+function finFenetre(pas: PasSlider, depuis: Date): Date | null {
+  const fin = new Date(depuis);
+  switch (pas) {
+    case 'JOUR':
+      fin.setDate(fin.getDate() + 1);
+      return fin;
+    case 'SEMAINE':
+      fin.setDate(fin.getDate() + 7);
+      return fin;
+    case 'MOIS':
+      fin.setMonth(fin.getMonth() + 1);
+      return fin;
+    case 'TRIMESTRE':
+      fin.setMonth(fin.getMonth() + 3);
+      return fin;
+    case 'ANNEE':
+      fin.setFullYear(fin.getFullYear() + 1);
+      return fin;
+    case 'TOUTES':
+      return null;
+  }
+}
+
+function dateReference(e: Evenement): Date | null {
+  const brute = e.dateDeDebut ?? e.dateClef ?? e.dateDeFin;
+  return brute ? new Date(brute) : null;
+}
+
+/** Ne garde que les événements dont la date se situe entre aujourd'hui et la fin de la fenêtre choisie. */
+function filtrerParFenetre(evenements: Evenement[], pas: PasSlider): Evenement[] {
+  if (pas === 'TOUTES') return evenements;
+  const debut = new Date();
+  debut.setHours(0, 0, 0, 0);
+  const fin = finFenetre(pas, debut)!;
+  return evenements.filter((e) => {
+    const d = dateReference(e);
+    return d !== null && d >= debut && d < fin;
+  });
 }
 
 export default function Carte() {
   const { estAdministrateur } = useAuth();
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [chargement, setChargement] = useState(true);
-  const [lieuSelectionne, setLieuSelectionne] = useState<string>('ALL');
+  const [quartier, setQuartier] = useState('ALL');
+  const [quartiers, setQuartiers] = useState<{ label: string }[]>([]);
+  const [pasIndex, setPasIndex] = useState(5); // 5 = « Toutes les dates » par défaut
   const [geocodageEnCours, setGeocodageEnCours] = useState(false);
   const [messageGeocodage, setMessageGeocodage] = useState<string | null>(null);
 
@@ -83,11 +144,28 @@ export default function Carte() {
     charger();
   }, []);
 
-  const lieux = useMemo(() => regrouperParLieu(evenements), [evenements]);
-  const nonGeolocalises = evenements.filter((e) => e.statutGeocodage !== 'ok').length;
+  useEffect(() => {
+    api.get<{ quartiers: { label: string }[] }>('/evenements/options-filtres').then((res) => setQuartiers(res.quartiers));
+  }, []);
 
-  const lieuActif = lieuSelectionne === 'ALL' ? null : (lieux.find((l) => l.lieu === lieuSelectionne) ?? null);
-  const lieuxAffiches = lieuActif ? [lieuActif] : lieux;
+  const pasSlider = ETAPES_SLIDER[pasIndex].valeur;
+
+  // Les brouillons ne doivent jamais apparaître sur la carte, et un événement sur plusieurs jours ne
+  // doit produire qu'une seule fiche (pas une par jour occupé).
+  const evenementsUtiles = useMemo(
+    () => regrouperParEvenement(evenements.filter((e) => e.statut !== 'Brouillon')),
+    [evenements]
+  );
+
+  const evenementsFiltres = useMemo(() => {
+    let liste = evenementsUtiles;
+    if (quartier !== 'ALL') liste = liste.filter((e) => e.quartier === quartier);
+    liste = filtrerParFenetre(liste, pasSlider);
+    return liste;
+  }, [evenementsUtiles, quartier, pasSlider]);
+
+  const lieux = useMemo(() => regrouperParLieu(evenementsFiltres), [evenementsFiltres]);
+  const nonGeolocalises = evenements.filter((e) => e.statutGeocodage !== 'ok').length;
 
   const lancerGeocodage = async () => {
     setGeocodageEnCours(true);
@@ -119,21 +197,25 @@ export default function Carte() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <div style={{ minWidth: 280 }}>
-          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Lieu</div>
+        <div style={{ minWidth: 220 }}>
+          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Quartier</div>
           <Select
-            value={lieuSelectionne}
-            onChange={setLieuSelectionne}
+            value={quartier}
+            onChange={setQuartier}
             style={{ width: '100%' }}
-            showSearch
-            optionFilterProp="label"
-            options={[
-              { value: 'ALL', label: `Tous les lieux (${lieux.length})` },
-              ...lieux
-                .slice()
-                .sort((a, b) => a.lieu.localeCompare(b.lieu))
-                .map((l) => ({ value: l.lieu, label: `${l.lieu} (${l.evenements.length})` })),
-            ]}
+            options={[{ value: 'ALL', label: 'Tous les quartiers' }, ...quartiers.map((q) => ({ value: q.label, label: q.label }))]}
+          />
+        </div>
+        <div style={{ minWidth: 320, flex: 1, paddingRight: 40 }}>
+          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Période affichée</div>
+          <Slider
+            min={0}
+            max={ETAPES_SLIDER.length - 1}
+            step={1}
+            value={pasIndex}
+            onChange={setPasIndex}
+            marks={Object.fromEntries(ETAPES_SLIDER.map((e, i) => [i, e.labelCourt]))}
+            tooltip={{ formatter: (i) => (i !== undefined ? ETAPES_SLIDER[i].label : '') }}
           />
         </div>
         {estAdministrateur && (
@@ -166,8 +248,8 @@ export default function Carte() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <RecentrageCarte lieu={lieuActif} />
-          {lieuxAffiches.map((l) => (
+          <RecentrageCarte lieux={lieux} />
+          {lieux.map((l) => (
             <Marker key={l.lieu} position={[l.latitude, l.longitude]}>
               <Popup>
                 <div style={{ maxWidth: 260 }}>

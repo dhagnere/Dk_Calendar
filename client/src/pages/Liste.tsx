@@ -7,6 +7,7 @@ import type { Evenement } from '../types';
 import { ValidationBadge } from '../components/ValidationBadge';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { formatDate } from '../lib/formatDate';
+import { regrouperParEvenement } from '../lib/regrouperEvenements';
 
 const { Text } = Typography;
 
@@ -22,20 +23,6 @@ function formatDuree(e: Evenement): string | null {
   const fin = e.dateDeFin ? formatDate(e.dateDeFin) : null;
   if (!fin || fin === debut) return debut;
   return `du ${debut} au ${fin}`;
-}
-
-/**
- * Un événement sur plusieurs jours a une ligne par jour occupé (dateClef), toutes partageant le
- * même nom/dateDeDebut/dateDeFin. Pour la liste, on ne veut plus qu'une seule ligne par événement :
- * on regroupe donc par (nom, dateDeDebut, dateDeFin) et on ne garde qu'une ligne représentative.
- */
-function regrouperParEvenement(evenements: Evenement[]): Evenement[] {
-  const parCle = new Map<string, Evenement>();
-  for (const e of evenements) {
-    const cle = `${e.nom}|${e.dateDeDebut ?? ''}|${e.dateDeFin ?? ''}`;
-    if (!parCle.has(cle)) parCle.set(cle, e);
-  }
-  return [...parCle.values()];
 }
 
 /** Début (lundi) de la semaine contenant `date`. */
