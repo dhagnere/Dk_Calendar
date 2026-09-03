@@ -3,10 +3,12 @@ import { Button, Space, Typography } from 'antd';
 import { UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 import { api, ApiError } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useGeocodage } from '../context/GeocodageContext';
 
 /** Boutons d'export CSV (tout le monde) et d'import CSV (admin uniquement), avec message de résultat. */
 export function ImportExportEvenements({ onImported }: { onImported: () => void }) {
   const { estAdministrateur } = useAuth();
+  const { demarrer: demarrerGeocodage } = useGeocodage();
   const [message, setMessage] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -36,6 +38,7 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
       }
       setMessage(texte);
       onImported();
+      if (res.created > 0) demarrerGeocodage();
     } catch (err) {
       setErreur(err instanceof ApiError ? err.message : "Échec de l'import : impossible de contacter le serveur.");
     } finally {

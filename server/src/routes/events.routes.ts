@@ -181,7 +181,8 @@ eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
     await EventModel.updateMany({ ...NON_GEOCODE, $or: [{ lieu: null }, { lieu: '' }] }, { statutGeocodage: 'echec' });
 
     const enAttente = await EventModel.find(NON_GEOCODE, { lieu: 1 }).lean();
-    const adressesDistinctes = [...new Set(enAttente.map((e) => e.lieu.trim()))].slice(0, LOT_GEOCODAGE);
+    const toutesAdressesDistinctes = [...new Set(enAttente.map((e) => e.lieu.trim()))];
+    const adressesDistinctes = toutesAdressesDistinctes.slice(0, LOT_GEOCODAGE);
 
     let geocodes = 0;
     let echecs = 0;
@@ -203,8 +204,11 @@ eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
     }
 
     const restants = await EventModel.countDocuments(NON_GEOCODE);
+    // Toutes les adresses de `adressesDistinctes` ont été résolues (ok ou échec) ci-dessus : le nombre
+    // d'adresses distinctes encore à traiter est simplement le total moins celles de ce lot.
+    const adressesRestantes = Math.max(0, toutesAdressesDistinctes.length - adressesDistinctes.length);
     console.log(`[geocodage] ${geocodes} adresse(s) géocodée(s), ${echecs} échec(s), ${restants} événement(s) restant(s)`);
-    res.json({ ok: true, geocodes, echecs, restants });
+    res.json({ ok: true, geocodes, echecs, restants, adressesRestantes });
   } catch (err) {
     console.error('[geocodage] Échec :', err);
     res.status(500).json({

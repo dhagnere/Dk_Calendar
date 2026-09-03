@@ -5,15 +5,23 @@ import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { Alert, Button, Select, Slider, Space, Typography } from 'antd';
+import { Alert, Button, Select, Slider, Space, Spin, Typography } from 'antd';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useGeocodage } from '../context/GeocodageContext';
 import type { Evenement } from '../types';
 import { estValide } from '../types';
 import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { formatDate } from '../lib/formatDate';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
+
+/** Ex. « moins d'une minute », « 1 minute », « 4 minutes ». */
+function formatTempsEstime(secondes: number): string {
+  if (secondes < 60) return "moins d'une minute";
+  const minutes = Math.ceil(secondes / 60);
+  return minutes <= 1 ? '1 minute' : `${minutes} minutes`;
+}
 
 const { Text, Title } = Typography;
 
@@ -122,13 +130,12 @@ function filtrerParFenetre(evenements: Evenement[], pas: PasSlider): Evenement[]
 
 export default function Carte() {
   const { estAdministrateur } = useAuth();
+  const { enCours: geocodageEnCours, secondesRestantesEstimees, derniereMiseAJour, demarrer: demarrerGeocodage } = useGeocodage();
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [chargement, setChargement] = useState(true);
   const [quartier, setQuartier] = useState('ALL');
   const [quartiers, setQuartiers] = useState<{ label: string }[]>([]);
   const [pasIndex, setPasIndex] = useState(5); // 5 = « Toutes les dates » par défaut
-  const [geocodageEnCours, setGeocodageEnCours] = useState(false);
-  const [messageGeocodage, setMessageGeocodage] = useState<string | null>(null);
 
   const charger = async () => {
     setChargement(true);
@@ -143,6 +150,13 @@ export default function Carte() {
   useEffect(() => {
     charger();
   }, []);
+
+  // Un import CSV déclenche le géocodage automatiquement (voir GeocodageContext) : à chaque lot
+  // traité, on recharge les événements pour faire apparaître les nouveaux marqueurs au fur et à mesure.
+  useEffect(() => {
+    if (derniereMiseAJour > 0) charger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [derniereMiseAJour]);
 
   useEffect(() => {
     api.get<{ quartiers: { label: string }[] }>('/evenements/options-filtres').then((res) => setQuartiers(res.quartiers));
@@ -166,33 +180,6 @@ export default function Carte() {
 
   const lieux = useMemo(() => regrouperParLieu(evenementsFiltres), [evenementsFiltres]);
   const nonGeolocalises = evenements.filter((e) => e.statutGeocodage !== 'ok').length;
-
-  const lancerGeocodage = async () => {
-    setGeocodageEnCours(true);
-    setMessageGeocodage(null);
-    try {
-      let restants = 1;
-      let totalGeocodes = 0;
-      let totalEchecs = 0;
-      while (restants > 0) {
-        const res = await api.post<{ ok: boolean; geocodes: number; echecs: number; restants: number }>(
-          '/evenements/geocoder',
-          {}
-        );
-        totalGeocodes += res.geocodes;
-        totalEchecs += res.echecs;
-        restants = res.restants;
-        setMessageGeocodage(`${totalGeocodes} adresse(s) géocodée(s), ${totalEchecs} échec(s), ${restants} restant(s)…`);
-        if (res.geocodes === 0 && res.echecs === 0) break; // sécurité anti-boucle infinie
-      }
-      setMessageGeocodage(`Terminé : ${totalGeocodes} adresse(s) géocodée(s), ${totalEchecs} échec(s).`);
-      await charger();
-    } catch (err) {
-      setMessageGeocodage(err instanceof Error ? `Échec du géocodage : ${err.message}` : 'Échec du géocodage.');
-    } finally {
-      setGeocodageEnCours(false);
-    }
-  };
 
   return (
     <div>
@@ -220,7 +207,7 @@ export default function Carte() {
         </div>
         {estAdministrateur && (
           <Space direction="vertical" size={4}>
-            <Button icon={<EnvironmentOutlined />} loading={geocodageEnCours} onClick={lancerGeocodage}>
+            <Button icon={<EnvironmentOutlined />} loading={geocodageEnCours} onClick={demarrerGeocodage}>
               Géocoder les événements
             </Button>
             {nonGeolocalises > 0 && !geocodageEnCours && (
@@ -232,17 +219,34 @@ export default function Carte() {
         )}
       </div>
 
-      {messageGeocodage && (
-        <Alert type="info" showIcon message={messageGeocodage} style={{ marginBottom: 16 }} />
-      )}
-
       <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
         {lieux.length} lieu(x) géolocalisé(s) — {lieux.reduce((n, l) => n + l.evenements.length, 0)} événement(s) affiché(s) sur la
         carte
         {nonGeolocalises > 0 && !estAdministrateur && ` (${nonGeolocalises} événement(s) non géolocalisé(s) non affiché(s))`}
       </Text>
 
-      <div style={{ border: '1px solid #d9d9d9', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ border: '1px solid #d9d9d9', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+        {geocodageEnCours && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              background: 'rgba(255, 255, 255, 0.75)',
+            }}
+          >
+            <Spin size="large" />
+            <Text strong>Géolocalisation en cours…</Text>
+            <Text type="secondary">
+              Temps estimé : {secondesRestantesEstimees !== null ? formatTempsEstime(secondesRestantesEstimees) : '…'}
+            </Text>
+          </div>
+        )}
         <MapContainer center={CENTRE_DUNKERQUE} zoom={12} style={{ height: 600, width: '100%' }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
