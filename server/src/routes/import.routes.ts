@@ -15,9 +15,21 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 
 export const importRouter = Router();
 
-/** Clé d'identité d'un événement : eventId si présent, sinon le couple (nom, dateClef). */
-function cleIdentite(e: { eventId?: string | null; nom: string; dateClef?: Date | null }): string {
-  return e.eventId ? `id:${e.eventId}` : `nom:${e.nom}|date:${e.dateClef ? e.dateClef.toISOString() : ''}`;
+/**
+ * Clé d'identité d'un événement : eventId si présent, sinon le couple (nom, date). La date utilisée
+ * est dateClef si présente, sinon dateDeDebut en repli (un export brut sans notion de « dateClef »
+ * n'a souvent qu'une date de début) : cela évite de fusionner deux événements distincts qui
+ * partageraient le même nom à des dates différentes.
+ */
+function cleIdentite(e: {
+  eventId?: string | null;
+  nom: string;
+  dateClef?: Date | null;
+  dateDeDebut?: Date | null;
+}): string {
+  if (e.eventId) return `id:${e.eventId}`;
+  const date = e.dateClef ?? e.dateDeDebut ?? null;
+  return `nom:${e.nom}|date:${date ? date.toISOString() : ''}`;
 }
 
 /**
@@ -43,7 +55,7 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
   try {
     const { rows, errors } = parseEventsCsv(req.file.buffer.toString('utf-8'));
 
-    const existants = await EventModel.find({}, { eventId: 1, nom: 1, dateClef: 1 }).lean();
+    const existants = await EventModel.find({}, { eventId: 1, nom: 1, dateClef: 1, dateDeDebut: 1 }).lean();
     const clesExistantes = new Set(existants.map(cleIdentite));
 
     const clesVues = new Set<string>();
