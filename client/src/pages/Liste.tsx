@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, Input, Select, Table, Typography, type TableColumnsType } from 'antd';
+import { Button, Checkbox, Input, Popconfirm, Select, Table, Typography, type TableColumnsType } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Evenement } from '../types';
@@ -59,6 +60,11 @@ export default function Liste() {
     charger();
   };
 
+  const supprimer = async (id: string) => {
+    await api.delete(`/evenements/${id}`);
+    charger();
+  };
+
   const total = evenements.length;
 
   const columns: TableColumnsType<Evenement> = [
@@ -92,6 +98,16 @@ export default function Liste() {
                 <Button size="small" onClick={() => validerUnClic(e._id)}>
                   Valider
                 </Button>
+                <Popconfirm
+                  title="Supprimer cet événement ?"
+                  description="Cette action est définitive."
+                  okText="Supprimer"
+                  okButtonProps={{ danger: true }}
+                  cancelText="Annuler"
+                  onConfirm={() => supprimer(e._id)}
+                >
+                  <Button size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>
               </div>
             ),
           },

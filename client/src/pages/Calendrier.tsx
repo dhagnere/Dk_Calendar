@@ -106,7 +106,14 @@ export default function Calendrier() {
   const [mois, setMois] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [jourSelectionne, setJourSelectionne] = useState<Date | null>(null);
-  const [stats, setStats] = useState<{ total: number; validated: number; pending: number } | null>(null);
+  const [stats, setStats] = useState<{
+    total: number;
+    validated: number;
+    pending: number;
+    anneeActuelle: number;
+    anneeEnCours: number;
+    depuis2020: number;
+  } | null>(null);
   const [quartier, setQuartier] = useState('ALL');
   const [statut, setStatut] = useState('ALL');
   const [type, setType] = useState('ALL');
@@ -119,7 +126,14 @@ export default function Calendrier() {
     if (type !== 'ALL') params.set('type', type);
     const data = await api.get<{ items: Evenement[] }>(`/evenements?${params.toString()}`);
     setEvenements(data.items);
-    const s = await api.get<{ total: number; validated: number; pending: number }>('/evenements/stats');
+    const s = await api.get<{
+      total: number;
+      validated: number;
+      pending: number;
+      anneeActuelle: number;
+      anneeEnCours: number;
+      depuis2020: number;
+    }>('/evenements/stats');
     setStats(s);
   };
 
@@ -248,6 +262,27 @@ export default function Calendrier() {
               <div style={{ fontSize: 24, fontWeight: 700, color: '#d46b08' }}>{stats.pending}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 En attente
+              </Text>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {stats && (
+        <Row gutter={12} style={{ marginBottom: 16 }}>
+          <Col span={12}>
+            <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
+              <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.anneeEnCours}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Manifestations en {stats.anneeActuelle}
+              </Text>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
+              <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.depuis2020}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Total des événements depuis 2020
               </Text>
             </Card>
           </Col>

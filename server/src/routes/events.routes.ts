@@ -43,22 +43,46 @@ eventsRouter.get('/options-filtres', async (_req, res) => {
   res.json({ quartiers: format(quartiers), natures: format(natures), statuts: format(statuts), types: format(types) });
 });
 
-/** Statistiques KPI (total, validés, en attente). */
+/** Statistiques KPI (total, validés, en attente, année en cours, depuis 2020). */
 eventsRouter.get('/stats', async (_req, res) => {
-  const [total, validated, byStatut, byNature] = await Promise.all([
+  // Date de référence d'un événement pour le comptage par année : dateDeDebut si présente, sinon dateClef.
+  const dateReference = { $ifNull: ['$dateDeDebut', '$dateClef'] };
+  const anneeActuelle = new Date().getFullYear();
+  const debutAnneeActuelle = new Date(anneeActuelle, 0, 1);
+  const debutAnneeSuivante = new Date(anneeActuelle + 1, 0, 1);
+  const debut2020 = new Date(2020, 0, 1);
+
+  const [total, validated, byStatut, byNature, anneeEnCours, depuis2020] = await Promise.all([
     EventModel.countDocuments({}),
     EventModel.countDocuments({ validationTechnique: true, validationPolitique: true }),
     EventModel.aggregate([{ $group: { _id: '$statut', count: { $sum: 1 } } }]),
     EventModel.aggregate([{ $group: { _id: '$nature', count: { $sum: 1 } } }]),
+    EventModel.countDocuments({
+      $expr: { $and: [{ $gte: [dateReference, debutAnneeActuelle] }, { $lt: [dateReference, debutAnneeSuivante] }] },
+    }),
+    EventModel.countDocuments({ $expr: { $gte: [dateReference, debut2020] } }),
   ]);
 
   res.json({
     total,
     validated,
     pending: total - validated,
+    anneeActuelle,
+    anneeEnCours,
+    depuis2020,
     byStatut: byStatut.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
     byNature: byNature.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
   });
+});
+
+/** Supprime un événement (utile notamment pour nettoyer un doublon créé par un import antérieur). */
+eventsRouter.delete('/:id', requireAdmin, async (req, res) => {
+  const deleted = await EventModel.findByIdAndDelete(req.params.id);
+  if (!deleted) {
+    res.status(404).json({ ok: false, message: 'Événement introuvable' });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 eventsRouter.get('/:id', async (req, res) => {

@@ -16,10 +16,16 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 export const importRouter = Router();
 
 /**
- * Clé d'identité d'un événement : eventId si présent, sinon le couple (nom, date). La date utilisée
+ * Clé d'identité d'un événement : eventId si présent, sinon le couple (nom, jour). La date utilisée
  * est dateClef si présente, sinon dateDeDebut en repli (un export brut sans notion de « dateClef »
  * n'a souvent qu'une date de début) : cela évite de fusionner deux événements distincts qui
  * partageraient le même nom à des dates différentes.
+ *
+ * Seul le JOUR calendaire compte (l'heure est ignorée) : un événement déjà en base avec une dateClef
+ * à minuit et la même ligne réimportée depuis un export brut dont la « Date de début » porte une
+ * heure précise (ex: 02/09/2026 14:00:00) doivent être reconnus comme le même événement, sans quoi
+ * la ligne est (re)créée comme un doublon — c'est le bug rapporté (Ducasse de Rosendael en double,
+ * une version validée et une non validée pour le même jour).
  */
 function cleIdentite(e: {
   eventId?: string | null;
@@ -29,7 +35,10 @@ function cleIdentite(e: {
 }): string {
   if (e.eventId) return `id:${e.eventId}`;
   const date = e.dateClef ?? e.dateDeDebut ?? null;
-  return `nom:${e.nom}|date:${date ? date.toISOString() : ''}`;
+  const jour = date
+    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    : '';
+  return `nom:${e.nom}|date:${jour}`;
 }
 
 /**
