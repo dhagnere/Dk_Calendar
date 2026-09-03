@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { Button, Card, Col, DatePicker, Grid, Modal, Row, Select, Switch, Typography } from 'antd';
+import { FilePdfOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
@@ -8,6 +9,8 @@ import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { FicheEvenement } from '../components/FicheEvenement';
 import { formatTitreEvenement } from '../lib/formatTitre';
+import { majusculeInitiale } from '../lib/formatDate';
+import { exporterFicheJourPdf } from '../lib/pdf';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -35,10 +38,6 @@ function memeJour(a: Date, b: Date): boolean {
 
 function couleurValidation(e: Evenement): string {
   return estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE;
-}
-
-function majusculeInitiale(texte: string): string {
-  return texte.charAt(0).toUpperCase() + texte.slice(1);
 }
 
 /** Petite pastille de couleur placée devant le texte pour indiquer la validation. */
@@ -419,7 +418,15 @@ export default function Calendrier() {
       <Modal
         open={!!jourSelectionne}
         onCancel={() => setJourSelectionne(null)}
-        footer={null}
+        footer={[
+          <Button
+            key="pdf"
+            icon={<FilePdfOutlined />}
+            onClick={() => jourSelectionne && exporterFicheJourPdf(jourSelectionne, evenementsJourOuvert)}
+          >
+            Télécharger en PDF
+          </Button>,
+        ]}
         width={mobile ? '94%' : tablette ? '90%' : 720}
         title={
           jourSelectionne

@@ -9,6 +9,7 @@ import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
 import { formatDuree } from '../lib/formatDuree';
 import { formatTitreEvenement } from '../lib/formatTitre';
+import { exporterListePdf } from '../lib/pdf';
 
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -276,7 +277,7 @@ export default function Liste() {
           unCheckedChildren={mobile ? 'Archivés masqués' : 'Événements archivés masqués'}
         />
         <div style={{ marginLeft: mobile ? 0 : 'auto', width: mobile ? '100%' : undefined }}>
-          <ImportExportEvenements onImported={charger} />
+          <ImportExportEvenements onImported={charger} onExporterPdf={() => exporterListePdf(lignes)} />
         </div>
       </div>
 

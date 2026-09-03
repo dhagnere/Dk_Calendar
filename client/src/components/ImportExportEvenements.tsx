@@ -1,12 +1,21 @@
 import { useRef, useState } from 'react';
 import { Button, Space, Typography } from 'antd';
-import { UploadOutlined, DownloadOutlined } from '@ant-design/icons';
+import { UploadOutlined, DownloadOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { api, ApiError } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useGeocodage } from '../context/GeocodageContext';
 
-/** Boutons d'export CSV (tout le monde) et d'import CSV (admin uniquement), avec message de résultat. */
-export function ImportExportEvenements({ onImported }: { onImported: () => void }) {
+interface Props {
+  onImported: () => void;
+  /** Si fourni, affiche un bouton « Exporter PDF » (visible de tous, consultation comprise). */
+  onExporterPdf?: () => void;
+}
+
+/**
+ * Boutons d'export CSV/PDF (tout le monde, consultation seule comprise — ce sont des actions de
+ * lecture) et d'import CSV (admin uniquement), avec message de résultat.
+ */
+export function ImportExportEvenements({ onImported, onExporterPdf }: Props) {
   const { estAdministrateur } = useAuth();
   const { demarrer: demarrerGeocodage } = useGeocodage();
   const [message, setMessage] = useState<string | null>(null);
@@ -53,6 +62,11 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
         <Button icon={<DownloadOutlined />} onClick={exporterCsv}>
           Exporter CSV
         </Button>
+        {onExporterPdf && (
+          <Button icon={<FilePdfOutlined />} onClick={onExporterPdf}>
+            Exporter PDF
+          </Button>
+        )}
         {estAdministrateur && (
           <>
             <Button type="primary" icon={<UploadOutlined />} loading={enCours} onClick={() => inputRef.current?.click()}>

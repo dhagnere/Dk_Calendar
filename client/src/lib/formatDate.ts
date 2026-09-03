@@ -5,3 +5,8 @@ export function formatDate(value: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('fr-FR');
 }
+
+/** Met en capitale la première lettre, ex. pour un intitulé de jour ("jeudi 3…" -> "Jeudi 3…"). */
+export function majusculeInitiale(texte: string): string {
+  return texte.charAt(0).toUpperCase() + texte.slice(1);
+}
