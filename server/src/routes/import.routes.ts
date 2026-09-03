@@ -15,6 +15,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 
 export const importRouter = Router();
 
+/** Clé d'identité d'un événement : eventId si présent, sinon le couple (nom, dateClef). */
+function cleIdentite(e: { eventId?: string | null; nom: string; dateClef?: Date | null }): string {
+  return e.eventId ? `id:${e.eventId}` : `nom:${e.nom}|date:${e.dateClef ? e.dateClef.toISOString() : ''}`;
+}
+
 /**
  * Importe des événements depuis un fichier CSV. Un événement de plusieurs jours a une ligne par
  * jour occupé (même nom, même dateDeDebut/dateDeFin, mais dateClef différente) : l'identité d'une
@@ -24,6 +29,10 @@ export const importRouter = Router();
  * dont l'identité correspond à un événement déjà présent (dans la base, ou déjà rencontré plus tôt
  * dans le même fichier) est un doublon : elle est ignorée sans rien modifier, pour ne jamais écraser
  * le statut, les validations ou toute autre donnée déjà saisie dans l'application.
+ *
+ * Les identités déjà en base sont chargées en une seule requête et les nouveaux événements insérés
+ * en un seul lot (au lieu de deux allers-retours base par ligne) : avec un gros fichier, la version
+ * ligne par ligne pouvait dépasser le délai d'attente du serveur (erreur 502).
  */
 importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (req, res) => {
   if (!req.file) {
@@ -31,34 +40,40 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
     return;
   }
 
-  const { rows, errors } = parseEventsCsv(req.file.buffer.toString('utf-8'));
+  try {
+    const { rows, errors } = parseEventsCsv(req.file.buffer.toString('utf-8'));
 
-  let created = 0;
-  let doublons = 0;
-  const clesVues = new Set<string>();
+    const existants = await EventModel.find({}, { eventId: 1, nom: 1, dateClef: 1 }).lean();
+    const clesExistantes = new Set(existants.map(cleIdentite));
 
-  for (const row of rows) {
-    const cle = row.eventId ? `id:${row.eventId}` : `nom:${row.nom}|date:${row.dateClef?.toISOString() ?? ''}`;
+    const clesVues = new Set<string>();
+    const aCreer: typeof rows = [];
+    let doublons = 0;
 
-    if (clesVues.has(cle)) {
-      doublons++;
-      continue;
-    }
-    clesVues.add(cle);
-
-    const filter = row.eventId ? { eventId: row.eventId } : { nom: row.nom, dateClef: row.dateClef };
-    const existant = await EventModel.exists(filter);
-    if (existant) {
-      doublons++;
-      continue;
+    for (const row of rows) {
+      const cle = cleIdentite(row);
+      if (clesVues.has(cle) || clesExistantes.has(cle)) {
+        doublons++;
+        continue;
+      }
+      clesVues.add(cle);
+      aCreer.push(row);
     }
 
-    await EventModel.create(row);
-    created++;
+    if (aCreer.length > 0) {
+      await EventModel.insertMany(aCreer, { ordered: false });
+    }
+
+    const created = aCreer.length;
+    console.log(`[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${errors.length} lignes ignorées`);
+    res.json({ ok: true, created, doublons, errors, total: rows.length });
+  } catch (err) {
+    console.error("[import] Échec de l'import événements :", err);
+    res.status(500).json({
+      ok: false,
+      message: `Échec de l'import : ${err instanceof Error ? err.message : 'erreur inconnue'}`,
+    });
   }
-
-  console.log(`[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${errors.length} lignes ignorées`);
-  res.json({ ok: true, created, doublons, errors, total: rows.length });
 });
 
 /** Exporte tous les événements au format CSV. */
@@ -77,48 +92,56 @@ importRouter.post('/utilisateurs', requireAdmin, upload.single('fichier'), async
     return;
   }
 
-  const { rows, errors } = parseUsersCsv(req.file.buffer.toString('utf-8'));
+  try {
+    const { rows, errors } = parseUsersCsv(req.file.buffer.toString('utf-8'));
 
-  let created = 0;
-  let updated = 0;
-  const motsDePasseGeneres: Array<{ email: string; motDePasse: string }> = [];
+    let created = 0;
+    let updated = 0;
+    const motsDePasseGeneres: Array<{ email: string; motDePasse: string }> = [];
 
-  for (const row of rows) {
-    const existant = await UserModel.findOne({ email: row.email });
+    for (const row of rows) {
+      const existant = await UserModel.findOne({ email: row.email });
 
-    if (existant) {
-      existant.nom = row.nom;
-      existant.role = row.role as 'Administrateur' | 'Consultant';
-      existant.statut = row.statut;
-      if (row.motDePasseInitial) {
-        const { hash, sel } = await genererHash(row.motDePasseInitial);
-        existant.hash = hash;
-        existant.sel = sel;
-        existant.statut = 'Mot de passe à définir';
+      if (existant) {
+        existant.nom = row.nom;
+        existant.role = row.role as 'Administrateur' | 'Consultant';
+        existant.statut = row.statut;
+        if (row.motDePasseInitial) {
+          const { hash, sel } = await genererHash(row.motDePasseInitial);
+          existant.hash = hash;
+          existant.sel = sel;
+          existant.statut = 'Mot de passe à définir';
+        }
+        await existant.save();
+        updated++;
+      } else {
+        const motDePasse = row.motDePasseInitial || genererSel().slice(0, 12);
+        const { hash, sel } = await genererHash(motDePasse);
+        await UserModel.create({
+          nom: row.nom,
+          email: row.email,
+          role: row.role,
+          statut: 'Mot de passe à définir',
+          hash,
+          sel,
+        });
+        motsDePasseGeneres.push({ email: row.email, motDePasse });
+        created++;
       }
-      await existant.save();
-      updated++;
-    } else {
-      const motDePasse = row.motDePasseInitial || genererSel().slice(0, 12);
-      const { hash, sel } = await genererHash(motDePasse);
-      await UserModel.create({
-        nom: row.nom,
-        email: row.email,
-        role: row.role,
-        statut: 'Mot de passe à définir',
-        hash,
-        sel,
-      });
-      motsDePasseGeneres.push({ email: row.email, motDePasse });
-      created++;
     }
-  }
 
-  if (motsDePasseGeneres.length > 0) {
-    console.log('[import] Mots de passe temporaires générés :', motsDePasseGeneres);
+    if (motsDePasseGeneres.length > 0) {
+      console.log('[import] Mots de passe temporaires générés :', motsDePasseGeneres);
+    }
+    console.log(`[import] Utilisateurs : ${created} créés, ${updated} mis à jour, ${errors.length} lignes ignorées`);
+    res.json({ ok: true, created, updated, errors, total: rows.length, motsDePasseGeneres });
+  } catch (err) {
+    console.error("[import] Échec de l'import utilisateurs :", err);
+    res.status(500).json({
+      ok: false,
+      message: `Échec de l'import : ${err instanceof Error ? err.message : 'erreur inconnue'}`,
+    });
   }
-  console.log(`[import] Utilisateurs : ${created} créés, ${updated} mis à jour, ${errors.length} lignes ignorées`);
-  res.json({ ok: true, created, updated, errors, total: rows.length, motsDePasseGeneres });
 });
 
 /** Exporte tous les utilisateurs (sans mot de passe) au format CSV. */
