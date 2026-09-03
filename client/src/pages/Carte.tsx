@@ -13,7 +13,7 @@ import { useGeocodage } from '../context/GeocodageContext';
 import type { Evenement } from '../types';
 import { estValide } from '../types';
 import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
-import { formatDate } from '../lib/formatDate';
+import { formatDuree } from '../lib/formatDuree';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
 
 /** Ex. « moins d'une minute », « 1 minute », « 4 minutes ». */
@@ -260,7 +260,7 @@ export default function Carte() {
                   <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
                     {l.lieu}
                   </Title>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {l.evenements.map((e) => (
                       <div key={e._id} style={{ fontSize: 12 }}>
                         <span
@@ -273,7 +273,10 @@ export default function Carte() {
                             background: estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE,
                           }}
                         />
-                        <strong>{e.nom}</strong> — {formatDate(e.dateDeDebut)}
+                        <strong>{e.nom}</strong>
+                        {formatDuree(e) && (
+                          <div style={{ marginLeft: 14, color: '#8c8c8c' }}>{formatDuree(e)}</div>
+                        )}
                       </div>
                     ))}
                   </div>

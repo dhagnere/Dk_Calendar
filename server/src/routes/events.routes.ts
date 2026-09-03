@@ -218,13 +218,21 @@ eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
   }
 });
 
-/** Supprime un événement (utile notamment pour nettoyer un doublon créé par un import antérieur). */
+/**
+ * Supprime un événement. La Liste n'affichant plus qu'une seule ligne par événement sur plusieurs
+ * jours, supprimer cette ligne doit retirer tous les jours de la série (même nom/dateDeDebut/dateDeFin,
+ * mais dateClef différente de celui ciblé). Un doublon strict (même jour, dateClef identique, produit
+ * par un import répété) n'est en revanche jamais supprimé automatiquement : seul le document ciblé
+ * l'est, l'autre reste en base — il doit toujours en rester un.
+ */
 eventsRouter.delete('/:id', requireAdmin, async (req, res) => {
-  const deleted = await EventModel.findByIdAndDelete(req.params.id);
-  if (!deleted) {
+  const cible = await EventModel.findById(req.params.id).lean();
+  if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
+  await EventModel.deleteMany({ ...filtreSerie(cible), dateClef: { $ne: cible.dateClef } });
+  await EventModel.findByIdAndDelete(cible._id);
   res.json({ ok: true });
 });
 

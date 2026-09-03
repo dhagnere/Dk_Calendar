@@ -6,8 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import type { Evenement } from '../types';
 import { ValidationBadge } from '../components/ValidationBadge';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
-import { formatDate } from '../lib/formatDate';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
+import { formatDuree } from '../lib/formatDuree';
 
 const { Text } = Typography;
 
@@ -15,15 +15,6 @@ const MOIS_FR = [
   'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
   'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
 ];
-
-/** Texte de durée affiché sous le nom d'un événement, ex. "du 12/07/2026 au 15/07/2026". */
-function formatDuree(e: Evenement): string | null {
-  if (!e.dateDeDebut) return null;
-  const debut = formatDate(e.dateDeDebut);
-  const fin = e.dateDeFin ? formatDate(e.dateDeFin) : null;
-  if (!fin || fin === debut) return debut;
-  return `du ${debut} au ${fin}`;
-}
 
 /** Début (lundi) de la semaine contenant `date`. */
 function debutSemaine(date: Date): Date {
