@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { EventModel } from '../models/Event.js';
 import { requireAdmin } from '../middleware/auth.js';
-import { geocoderPlusieursAdresses } from '../lib/geocodage.js';
+import { LIMITES_CUD, geocoderPlusieursAdresses } from '../lib/geocodage.js';
 
 export const eventsRouter = Router();
 
@@ -147,7 +147,11 @@ eventsRouter.get('/stats', async (_req, res) => {
 const NON_GEOCODE = { statutGeocodage: { $nin: ['ok', 'echec'] } };
 
 /**
- * Géocode un lot d'événements en attente, pour la page Carte.
+ * Géocode un lot d'événements en attente, pour la page Carte. La recherche est bornée au territoire
+ * de la Communauté urbaine de Dunkerque (voir geocodage.ts) pour éviter qu'un nom de salle ambigu
+ * (ex. « Salle des fêtes » sans indication de ville) ne soit localisé sur une commune homonyme
+ * ailleurs en France.
+ *
  * Nominatim (le service de géocodage gratuit utilisé) impose 1 requête par seconde : un seul appel
  * ne traite donc qu'un nombre limité d'adresses distinctes (LOT_GEOCODAGE) pour rester dans le délai
  * d'une requête HTTP. Le client rappelle cette route en boucle jusqu'à ce que `restants` soit à 0.
@@ -155,6 +159,24 @@ const NON_GEOCODE = { statutGeocodage: { $nin: ['ok', 'echec'] } };
  */
 eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
   try {
+    // Événements déjà géocodés lors d'exécutions précédentes (avant la contrainte géographique
+    // ci-dessus) dont les coordonnées tombent hors de la CUD : à reprendre avec la recherche bornée.
+    const remis = await EventModel.updateMany(
+      {
+        statutGeocodage: 'ok',
+        $or: [
+          { latitude: { $lt: LIMITES_CUD.latMin } },
+          { latitude: { $gt: LIMITES_CUD.latMax } },
+          { longitude: { $lt: LIMITES_CUD.lonMin } },
+          { longitude: { $gt: LIMITES_CUD.lonMax } },
+        ],
+      },
+      { statutGeocodage: 'attente', latitude: null, longitude: null }
+    );
+    if (remis.modifiedCount > 0) {
+      console.log(`[geocodage] ${remis.modifiedCount} événement(s) hors de la CUD remis en attente pour re-géocodage`);
+    }
+
     // Un événement sans lieu du tout ne pourra jamais être géocodé : on l'écarte tout de suite.
     await EventModel.updateMany({ ...NON_GEOCODE, $or: [{ lieu: null }, { lieu: '' }] }, { statutGeocodage: 'echec' });
 
