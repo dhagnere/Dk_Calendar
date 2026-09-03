@@ -48,7 +48,7 @@ export function FicheEvenement({ evenement, estAdministrateur, onToggleValidatio
       }
       extra={<ValidationBadge evenement={evenement} />}
     >
-      <Descriptions column={2} size="small" items={items} />
+      <Descriptions column={{ xs: 1, sm: 2 }} size="small" items={items} />
 
       {estAdministrateur && (
         <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>

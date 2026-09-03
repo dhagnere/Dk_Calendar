@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Button, Checkbox, Input, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
+import { Button, Checkbox, Grid, Input, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,7 @@ import { regrouperParEvenement } from '../lib/regrouperEvenements';
 import { formatDuree } from '../lib/formatDuree';
 
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const MOIS_FR = [
   'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
@@ -80,6 +81,8 @@ function regrouperParSemaine(evenements: Evenement[]): LigneListe[] {
 
 export default function Liste() {
   const { estAdministrateur } = useAuth();
+  const breakpoint = useBreakpoint();
+  const mobile = !breakpoint.sm;
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [chargement, setChargement] = useState(true);
   const [recherche, setRecherche] = useState('');
@@ -142,10 +145,11 @@ export default function Liste() {
   const lignes = useMemo(() => regrouperParSemaine(evenementsGroupes), [evenementsGroupes]);
 
   /** Colonnes « normales », appliquées uniquement aux lignes de type événement. */
-  const colonnesEvenement: { title: string; key: string; render: (e: Evenement) => ReactNode }[] = [
+  const colonnesEvenement: { title: string; key: string; width?: number; render: (e: Evenement) => ReactNode }[] = [
     {
       title: 'Nom',
       key: 'nom',
+      width: 220,
       render: (e) => (
         <div>
           <Text strong>{e.nom}</Text>
@@ -153,15 +157,16 @@ export default function Liste() {
         </div>
       ),
     },
-    { title: 'Quartier', key: 'quartier', render: (e) => e.quartier },
-    { title: 'Nature', key: 'nature', render: (e) => e.nature },
-    { title: 'Statut', key: 'statut', render: (e) => e.statut },
-    { title: 'Validation', key: 'validation', render: (e) => <ValidationBadge evenement={e} /> },
+    { title: 'Quartier', key: 'quartier', width: 150, render: (e) => e.quartier },
+    { title: 'Nature', key: 'nature', width: 130, render: (e) => e.nature },
+    { title: 'Statut', key: 'statut', width: 110, render: (e) => e.statut },
+    { title: 'Validation', key: 'validation', width: 130, render: (e) => <ValidationBadge evenement={e} /> },
     ...(estAdministrateur
       ? [
           {
             title: 'Actions',
             key: 'actions',
+            width: 260,
             render: (e: Evenement) => (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
                 <Checkbox
@@ -204,6 +209,7 @@ export default function Liste() {
   const columns: TableColumnsType<LigneListe> = colonnesEvenement.map((col, index) => ({
     title: col.title,
     key: col.key,
+    width: col.width,
     onCell: (ligne: LigneListe) => {
       if (ligne.type !== 'entete') return {};
       return index === 0 ? { colSpan: colonnesEvenement.length, style: { background: '#e6f4ff' } } : { colSpan: 0 };
@@ -223,11 +229,11 @@ export default function Liste() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <div style={{ minWidth: 220, flex: 1 }}>
+        <div style={{ minWidth: mobile ? '100%' : 220, flex: 1 }}>
           <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Recherche</div>
           <Input placeholder="Nom de l'événement…" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
         </div>
-        <div style={{ minWidth: 200 }}>
+        <div style={{ minWidth: mobile ? '100%' : 200, flex: mobile ? '1 0 100%' : undefined }}>
           <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Quartier</div>
           <Select
             value={quartier}
@@ -236,7 +242,7 @@ export default function Liste() {
             options={[{ value: 'ALL', label: 'Tous' }, ...options.quartiers.map((q) => ({ value: q.label, label: q.label }))]}
           />
         </div>
-        <div style={{ minWidth: 200 }}>
+        <div style={{ minWidth: mobile ? '100%' : 200, flex: mobile ? '1 0 100%' : undefined }}>
           <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Statut</div>
           <Select
             value={statut}
@@ -250,18 +256,25 @@ export default function Liste() {
           />
         </div>
         <Button
+          block={mobile}
           type={avecEvenementsPasses ? 'primary' : 'default'}
           onClick={() => setAvecEvenementsPasses((v) => !v)}
         >
-          {avecEvenementsPasses ? 'Masquer les événements passés' : 'Afficher les événements passés'}
+          {mobile
+            ? avecEvenementsPasses
+              ? 'Masquer le passé'
+              : 'Afficher le passé'
+            : avecEvenementsPasses
+              ? 'Masquer les événements passés'
+              : 'Afficher les événements passés'}
         </Button>
         <Switch
           checked={avecEvenementsArchives}
           onChange={setAvecEvenementsArchives}
-          checkedChildren="Événements archivés visibles"
-          unCheckedChildren="Événements archivés masqués"
+          checkedChildren={mobile ? 'Archivés visibles' : 'Événements archivés visibles'}
+          unCheckedChildren={mobile ? 'Archivés masqués' : 'Événements archivés masqués'}
         />
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: mobile ? 0 : 'auto', width: mobile ? '100%' : undefined }}>
           <ImportExportEvenements onImported={charger} />
         </div>
       </div>
@@ -278,6 +291,7 @@ export default function Liste() {
         loading={chargement}
         pagination={false}
         bordered
+        scroll={{ x: mobile ? 'max-content' : undefined }}
         locale={{ emptyText: 'Aucun événement' }}
       />
     </div>

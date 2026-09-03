@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Input, Select, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Button, Card, Grid, Input, Select, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { api } from '../api';
 import type { Compte } from '../types';
 import { genererMotDePasse } from '../lib/generatePassword';
 import { formatDate } from '../lib/formatDate';
 
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function Comptes() {
+  const breakpoint = useBreakpoint();
+  const mobile = !breakpoint.sm;
   const [comptes, setComptes] = useState<Compte[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -69,16 +72,17 @@ export default function Comptes() {
   const badgeColor = (statut: string) => (statut === 'Suspendu' ? 'red' : statut === 'Actif' ? 'green' : 'orange');
 
   const columns: TableColumnsType<Compte> = [
-    { title: 'Nom', dataIndex: 'nom', key: 'nom', render: (v: string) => <Text strong>{v}</Text> },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
-    { title: 'Rôle', dataIndex: 'role', key: 'role' },
-    { title: 'Statut', key: 'statut', render: (_, c) => <Tag color={badgeColor(c.statut)}>{c.statut}</Tag> },
-    { title: 'Dernière connexion', key: 'derniereConnexion', render: (_, c) => formatDate(c.derniereConnexion) },
+    { title: 'Nom', dataIndex: 'nom', key: 'nom', width: 160, render: (v: string) => <Text strong>{v}</Text> },
+    { title: 'Email', dataIndex: 'email', key: 'email', width: 200, ellipsis: true },
+    { title: 'Rôle', dataIndex: 'role', key: 'role', width: 130 },
+    { title: 'Statut', key: 'statut', width: 100, render: (_, c) => <Tag color={badgeColor(c.statut)}>{c.statut}</Tag> },
+    { title: 'Dernière connexion', key: 'derniereConnexion', width: 140, render: (_, c) => formatDate(c.derniereConnexion) },
     {
       title: 'Actions',
       key: 'actions',
+      width: 260,
       render: (_, c) => (
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button size="small" onClick={() => toggleStatut(c)}>
             {c.statut === 'Suspendu' ? 'Activer' : 'Suspendre'}
           </Button>
@@ -104,15 +108,15 @@ export default function Comptes() {
           onSubmit={creerCompte}
           style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}
         >
-          <div style={{ minWidth: 180, flex: 1 }}>
+          <div style={{ minWidth: mobile ? '100%' : 180, flex: 1 }}>
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Nom</div>
             <Input value={nom} onChange={(e) => setNom(e.target.value)} required />
           </div>
-          <div style={{ minWidth: 220, flex: 1 }}>
+          <div style={{ minWidth: mobile ? '100%' : 220, flex: 1 }}>
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Email</div>
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
-          <div style={{ minWidth: 180 }}>
+          <div style={{ minWidth: mobile ? '100%' : 180 }}>
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Rôle</div>
             <Select
               value={role}
@@ -124,7 +128,7 @@ export default function Comptes() {
               ]}
             />
           </div>
-          <Button type="primary" htmlType="submit" loading={envoi}>
+          <Button type="primary" htmlType="submit" loading={envoi} block={mobile}>
             Créer
           </Button>
         </form>
@@ -137,6 +141,7 @@ export default function Comptes() {
         columns={columns}
         dataSource={comptes}
         pagination={false}
+        scroll={{ x: mobile ? 'max-content' : undefined }}
       />
     </div>
   );

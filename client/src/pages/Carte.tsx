@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { Alert, Button, Select, Slider, Space, Spin, Typography } from 'antd';
+import { Alert, Button, Grid, Select, Slider, Space, Spin, Typography } from 'antd';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,7 @@ function formatTempsEstime(secondes: number): string {
 }
 
 const { Text, Title } = Typography;
+const { useBreakpoint } = Grid;
 
 // Correctif standard react-leaflet/Vite : les icônes par défaut ne se chargent pas sans ceci,
 // leur chemin étant résolu de façon incorrecte par les bundlers.
@@ -78,13 +79,13 @@ function RecentrageCarte({ lieux }: { lieux: LieuGeolocalise[] }) {
 
 type PasSlider = 'JOUR' | 'SEMAINE' | 'MOIS' | 'TRIMESTRE' | 'ANNEE' | 'TOUTES';
 
-const ETAPES_SLIDER: { valeur: PasSlider; label: string; labelCourt: string }[] = [
-  { valeur: 'JOUR', label: 'Jour', labelCourt: 'Jour' },
-  { valeur: 'SEMAINE', label: 'Semaine', labelCourt: 'Semaine' },
-  { valeur: 'MOIS', label: 'Mois', labelCourt: 'Mois' },
-  { valeur: 'TRIMESTRE', label: 'Trimestre', labelCourt: 'Trimestre' },
-  { valeur: 'ANNEE', label: 'Année', labelCourt: 'Année' },
-  { valeur: 'TOUTES', label: 'Toutes les dates', labelCourt: 'Toutes' },
+const ETAPES_SLIDER: { valeur: PasSlider; label: string; labelCourt: string; labelTresCourt: string }[] = [
+  { valeur: 'JOUR', label: 'Jour', labelCourt: 'Jour', labelTresCourt: 'J' },
+  { valeur: 'SEMAINE', label: 'Semaine', labelCourt: 'Semaine', labelTresCourt: 'S' },
+  { valeur: 'MOIS', label: 'Mois', labelCourt: 'Mois', labelTresCourt: 'M' },
+  { valeur: 'TRIMESTRE', label: 'Trimestre', labelCourt: 'Trimestre', labelTresCourt: 'T' },
+  { valeur: 'ANNEE', label: 'Année', labelCourt: 'Année', labelTresCourt: 'A' },
+  { valeur: 'TOUTES', label: 'Toutes les dates', labelCourt: 'Toutes', labelTresCourt: 'Tout' },
 ];
 
 /** Borne de fin de la fenêtre d'affichage, `null` pour « Toutes les dates » (pas de filtrage). */
@@ -130,6 +131,8 @@ function filtrerParFenetre(evenements: Evenement[], pas: PasSlider): Evenement[]
 
 export default function Carte() {
   const { estAdministrateur } = useAuth();
+  const breakpoint = useBreakpoint();
+  const mobile = !breakpoint.sm;
   const { enCours: geocodageEnCours, secondesRestantesEstimees, derniereMiseAJour, demarrer: demarrerGeocodage } = useGeocodage();
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [chargement, setChargement] = useState(true);
@@ -184,7 +187,7 @@ export default function Carte() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <div style={{ minWidth: 220 }}>
+        <div style={{ minWidth: mobile ? '100%' : 220 }}>
           <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Quartier</div>
           <Select
             value={quartier}
@@ -193,7 +196,7 @@ export default function Carte() {
             options={[{ value: 'ALL', label: 'Tous les quartiers' }, ...quartiers.map((q) => ({ value: q.label, label: q.label }))]}
           />
         </div>
-        <div style={{ minWidth: 320, flex: 1, paddingRight: 40 }}>
+        <div style={{ minWidth: mobile ? '100%' : 320, flex: 1, paddingRight: mobile ? 16 : 40 }}>
           <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Période affichée</div>
           <Slider
             min={0}
@@ -201,13 +204,13 @@ export default function Carte() {
             step={1}
             value={pasIndex}
             onChange={setPasIndex}
-            marks={Object.fromEntries(ETAPES_SLIDER.map((e, i) => [i, e.labelCourt]))}
+            marks={Object.fromEntries(ETAPES_SLIDER.map((e, i) => [i, mobile ? e.labelTresCourt : e.labelCourt]))}
             tooltip={{ formatter: (i) => (i !== undefined ? ETAPES_SLIDER[i].label : '') }}
           />
         </div>
         {estAdministrateur && (
-          <Space direction="vertical" size={4}>
-            <Button icon={<EnvironmentOutlined />} loading={geocodageEnCours} onClick={demarrerGeocodage}>
+          <Space direction="vertical" size={4} style={{ width: mobile ? '100%' : undefined }}>
+            <Button block={mobile} icon={<EnvironmentOutlined />} loading={geocodageEnCours} onClick={demarrerGeocodage}>
               Géocoder les événements
             </Button>
             {nonGeolocalises > 0 && !geocodageEnCours && (
@@ -247,7 +250,7 @@ export default function Carte() {
             </Text>
           </div>
         )}
-        <MapContainer center={CENTRE_DUNKERQUE} zoom={12} style={{ height: 600, width: '100%' }}>
+        <MapContainer center={CENTRE_DUNKERQUE} zoom={12} style={{ height: mobile ? 420 : 600, width: '100%' }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

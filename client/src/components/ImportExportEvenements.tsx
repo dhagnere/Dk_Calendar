@@ -49,7 +49,7 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
 
   return (
     <div>
-      <Space>
+      <Space wrap>
         <Button icon={<DownloadOutlined />} onClick={exporterCsv}>
           Exporter CSV
         </Button>

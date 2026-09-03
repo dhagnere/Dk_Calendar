@@ -73,7 +73,7 @@ export default function Demandes() {
                     Demandé le {new Date(d.createdAt).toLocaleDateString('fr-FR')}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <Select
                     value={roleDe(d._id)}
                     onChange={(v) => setRoleParDemande((r) => ({ ...r, [d._id]: v as 'Administrateur' | 'Consultant' }))}

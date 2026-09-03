@@ -1,29 +1,33 @@
+import { useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Button, Divider, Image, Layout, Space, Tag, Typography } from 'antd';
+import { Button, Divider, Drawer, Grid, Image, Layout, Space, Tag, Typography } from 'antd';
 import {
   CalendarOutlined,
   EnvironmentOutlined,
+  MenuOutlined,
   TeamOutlined,
   UnorderedListOutlined,
   UserAddOutlined,
 } from '@ant-design/icons';
-import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LOGO_CUD, LOGO_DUNKERQUE } from '../logos';
 
 const { Header, Content } = Layout;
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 function NavItem({
   actif,
   icone,
   label,
   onClick,
+  bloc,
 }: {
   actif: boolean;
   icone: ReactNode;
   label: string;
   onClick: () => void;
+  bloc?: boolean;
 }) {
   return (
     <button
@@ -34,9 +38,10 @@ function NavItem({
         gap: 8,
         border: 'none',
         cursor: 'pointer',
-        borderRadius: 999,
-        padding: '8px 16px',
-        fontSize: 14,
+        borderRadius: bloc ? 8 : 999,
+        padding: bloc ? '10px 14px' : '8px 16px',
+        width: bloc ? '100%' : undefined,
+        fontSize: bloc ? 15 : 14,
         fontWeight: 600,
         background: actif ? '#e6f4ff' : 'transparent',
         color: actif ? '#1958d9' : '#4b5563',
@@ -52,6 +57,9 @@ export function AppLayout() {
   const { session, loading, estAdministrateur, deconnexion } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const breakpoint = useBreakpoint();
+  const mobile = !breakpoint.md;
+  const [menuOuvert, setMenuOuvert] = useState(false);
 
   if (loading) {
     return (
@@ -74,6 +82,11 @@ export function AppLayout() {
       : []),
   ];
 
+  const allerA = (chemin: string) => {
+    navigate(chemin);
+    setMenuOuvert(false);
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header
@@ -87,37 +100,81 @@ export function AppLayout() {
           rowGap: 8,
           height: 'auto',
           lineHeight: 'normal',
-          padding: '10px 24px',
+          padding: mobile ? '10px 12px' : '10px 24px',
         }}
       >
-        <Space size="large" align="center" wrap>
+        <Space size={mobile ? 'small' : 'large'} align="center" wrap>
           <Space size="middle" align="center">
-            <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" height={36} preview={false} />
-            <Divider orientation="vertical" style={{ height: 32, margin: 0 }} />
-            <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" height={36} preview={false} />
+            <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" height={mobile ? 28 : 36} preview={false} />
+            {!mobile && (
+              <>
+                <Divider orientation="vertical" style={{ height: 32, margin: 0 }} />
+                <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" height={36} preview={false} />
+              </>
+            )}
           </Space>
-          <Text strong style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
+          <Text strong style={{ fontSize: mobile ? 15 : 18, whiteSpace: 'nowrap' }}>
             Calendrier Événements
           </Text>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {items.map((item) => (
-              <NavItem
-                key={item.key}
-                actif={location.pathname === item.key}
-                icone={item.icone}
-                label={item.label}
-                onClick={() => navigate(item.key)}
-              />
-            ))}
-          </div>
+          {!mobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+              {items.map((item) => (
+                <NavItem
+                  key={item.key}
+                  actif={location.pathname === item.key}
+                  icone={item.icone}
+                  label={item.label}
+                  onClick={() => allerA(item.key)}
+                />
+              ))}
+            </div>
+          )}
         </Space>
-        <Space style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-          {!estAdministrateur && <Tag color="blue">Consultation seule</Tag>}
-          <Text type="secondary">{session.nom}</Text>
-          <Button onClick={() => deconnexion()}>Déconnexion</Button>
-        </Space>
+        {mobile ? (
+          <Button icon={<MenuOutlined />} onClick={() => setMenuOuvert(true)} aria-label="Menu" />
+        ) : (
+          <Space style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+            {!estAdministrateur && <Tag color="blue">Consultation seule</Tag>}
+            <Text type="secondary">{session.nom}</Text>
+            <Button onClick={() => deconnexion()}>Déconnexion</Button>
+          </Space>
+        )}
       </Header>
-      <Content style={{ width: '100%', padding: '24px 32px' }}>
+
+      <Drawer
+        title="Menu"
+        placement="right"
+        open={menuOuvert}
+        onClose={() => setMenuOuvert(false)}
+        width={Math.min(300, typeof window !== 'undefined' ? window.innerWidth - 32 : 300)}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {items.map((item) => (
+            <NavItem
+              key={item.key}
+              bloc
+              actif={location.pathname === item.key}
+              icone={item.icone}
+              label={item.label}
+              onClick={() => allerA(item.key)}
+            />
+          ))}
+        </div>
+        <Divider />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!estAdministrateur && (
+            <Tag color="blue" style={{ width: 'fit-content' }}>
+              Consultation seule
+            </Tag>
+          )}
+          <Text type="secondary">{session.nom}</Text>
+          <Button block onClick={() => deconnexion()}>
+            Déconnexion
+          </Button>
+        </div>
+      </Drawer>
+
+      <Content style={{ width: '100%', padding: mobile ? '12px' : '24px 32px' }}>
         <Outlet />
       </Content>
     </Layout>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
-import { Button, Card, Col, DatePicker, Modal, Row, Select, Switch, Typography } from 'antd';
+import { Button, Card, Col, DatePicker, Grid, Modal, Row, Select, Switch, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
@@ -9,6 +9,7 @@ import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { FicheEvenement } from '../components/FicheEvenement';
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MOIS = [
@@ -103,6 +104,9 @@ function FiltreSelect({
 
 export default function Calendrier() {
   const { estAdministrateur } = useAuth();
+  const breakpoint = useBreakpoint();
+  const mobile = !breakpoint.sm;
+  const tablette = !breakpoint.md;
   const [mois, setMois] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [jourSelectionne, setJourSelectionne] = useState<Date | null>(null);
@@ -209,8 +213,8 @@ export default function Calendrier() {
           <Switch
             checked={avecEvenementsArchives}
             onChange={setAvecEvenementsArchives}
-            checkedChildren="Événements archivés visibles"
-            unCheckedChildren="Événements archivés masqués"
+            checkedChildren={mobile ? 'Archivés visibles' : 'Événements archivés visibles'}
+            unCheckedChildren={mobile ? 'Archivés masqués' : 'Événements archivés masqués'}
           />
           <ImportExportEvenements onImported={charger} />
         </Boite>
@@ -244,14 +248,20 @@ export default function Calendrier() {
             type={avecEvenementsPasses ? 'primary' : 'default'}
             onClick={() => setAvecEvenementsPasses((v) => !v)}
           >
-            {avecEvenementsPasses ? 'Masquer les événements passés' : 'Afficher les événements passés'}
+            {mobile
+              ? avecEvenementsPasses
+                ? 'Masquer le passé'
+                : 'Afficher le passé'
+              : avecEvenementsPasses
+                ? 'Masquer les événements passés'
+                : 'Afficher les événements passés'}
           </Button>
         </Boite>
       </div>
 
       {stats && (
-        <Row gutter={12} style={{ marginBottom: 16 }}>
-          <Col span={6}>
+        <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+          <Col xs={12} md={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -259,7 +269,7 @@ export default function Calendrier() {
               </Text>
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={12} md={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700, color: COULEUR_VALIDE }}>{stats.validated}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -267,7 +277,7 @@ export default function Calendrier() {
               </Text>
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={12} md={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700, color: '#d46b08' }}>{stats.pending}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -275,7 +285,7 @@ export default function Calendrier() {
               </Text>
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={12} md={6}>
             <Card size="small" style={{ textAlign: 'center', borderColor: COULEUR_BORDURE }}>
               <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.anneeEnCours}</div>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -307,29 +317,30 @@ export default function Calendrier() {
               key={j}
               style={{
                 textAlign: 'center',
-                padding: '10px 0',
-                fontSize: 13,
+                padding: mobile ? '6px 0' : '10px 0',
+                fontSize: mobile ? 11 : 13,
                 fontWeight: 600,
                 color: '#262626',
                 borderBottom: `2px solid ${COULEUR_BORDURE}`,
               }}
             >
-              {j}
+              {mobile ? j.slice(0, 1) : j}
             </div>
           ))}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
           {jours.map((jour, idx) => {
             const evts = evenementsDuJour(jour);
+            const maxLignes = mobile ? 0 : tablette ? 2 : MAX_LIGNES_VISIBLES;
+            const surplus = evts.length - maxLignes;
             const horsMois = jour.getMonth() !== mois.getMonth();
-            const surplus = evts.length - MAX_LIGNES_VISIBLES;
             const estAujourdhui = memeJour(jour, new Date());
             return (
               <button
                 key={jour.toISOString()}
                 onClick={() => setJourSelectionne(jour)}
                 style={{
-                  minHeight: 140,
+                  minHeight: mobile ? 52 : tablette ? 96 : 140,
                   minWidth: 0,
                   width: '100%',
                   overflow: 'hidden',
@@ -338,53 +349,66 @@ export default function Calendrier() {
                   borderRight: idx % 7 !== 6 ? `1px solid ${COULEUR_BORDURE}` : 'none',
                   borderBottom: `1px solid ${COULEUR_BORDURE}`,
                   textAlign: 'left',
-                  padding: 8,
+                  padding: mobile ? 4 : 8,
                   cursor: 'pointer',
                   color: horsMois ? '#bfbfbf' : '#141414',
                 }}
               >
                 <span
                   style={{
-                    fontSize: 13,
+                    fontSize: mobile ? 11 : 13,
                     fontWeight: estAujourdhui ? 700 : 500,
                     borderRadius: 999,
-                    padding: estAujourdhui ? '2px 8px' : undefined,
+                    padding: estAujourdhui ? (mobile ? '1px 6px' : '2px 8px') : undefined,
                     background: estAujourdhui ? '#1d4ed8' : undefined,
                     color: estAujourdhui ? '#fff' : undefined,
                   }}
                 >
                   {jour.getDate()}
                 </span>
-                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                  {evts.slice(0, MAX_LIGNES_VISIBLES).map((e) => (
-                    <div
-                      key={e._id}
-                      title={e.nom}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', minWidth: 0 }}
-                    >
-                      <Pastille couleur={couleurValidation(e)} />
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          fontSize: 11,
-                          lineHeight: 1.4,
-                          color: '#262626',
-                          flex: 1,
-                          minWidth: 0,
-                        }}
+                {mobile ? (
+                  evts.length > 0 && (
+                    <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                      {evts.slice(0, 6).map((e) => (
+                        <Pastille key={e._id} couleur={couleurValidation(e)} />
+                      ))}
+                      {evts.length > 6 && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: '#595959' }}>+{evts.length - 6}</span>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                    {evts.slice(0, maxLignes).map((e) => (
+                      <div
+                        key={e._id}
+                        title={e.nom}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', minWidth: 0 }}
                       >
-                        {e.nom}
-                      </span>
-                    </div>
-                  ))}
-                  {surplus > 0 && (
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#595959' }}>
-                      +{surplus} événement{surplus > 1 ? 's' : ''}
-                    </div>
-                  )}
-                </div>
+                        <Pastille couleur={couleurValidation(e)} />
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            fontSize: 11,
+                            lineHeight: 1.4,
+                            color: '#262626',
+                            flex: 1,
+                            minWidth: 0,
+                          }}
+                        >
+                          {e.nom}
+                        </span>
+                      </div>
+                    ))}
+                    {surplus > 0 && (
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#595959' }}>
+                        +{surplus} événement{surplus > 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -395,7 +419,7 @@ export default function Calendrier() {
         open={!!jourSelectionne}
         onCancel={() => setJourSelectionne(null)}
         footer={null}
-        width={720}
+        width={mobile ? '94%' : tablette ? '90%' : 720}
         title={
           jourSelectionne
             ? majusculeInitiale(
