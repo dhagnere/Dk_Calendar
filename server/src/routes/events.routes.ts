@@ -24,14 +24,21 @@ eventsRouter.get('/', async (req, res) => {
     filter.statut = statut;
   }
 
-  // Trie de la date la plus proche à la plus éloignée, sur dateDeDebut (pas dateClef, qui ne
-  // représente qu'un jour occupé par l'événement) puis par nom ; sinon dateClef en repli si un
-  // événement n'a pas de dateDeDebut. Les événements sans aucune date sont placés en dernier.
+  // Trie par proximité avec aujourd'hui décroissante : l'événement dont la dateDeDebut (ou dateClef
+  // en repli) est la plus proche de la date du jour arrive en premier, puis on s'éloigne
+  // progressivement (dans le passé comme dans le futur) vers l'événement le plus lointain. Les
+  // événements sans aucune date sont placés en dernier.
+  const maintenant = new Date();
   const items = await EventModel.aggregate([
     { $match: filter },
     { $addFields: { dateTri: { $ifNull: ['$dateDeDebut', '$dateClef'] } } },
     { $addFields: { dateTriAbsente: { $cond: [{ $eq: ['$dateTri', null] }, 1, 0] } } },
-    { $sort: { dateTriAbsente: 1, dateTri: 1, nom: 1 } },
+    {
+      $addFields: {
+        proximite: { $cond: [{ $eq: ['$dateTri', null] }, null, { $abs: { $subtract: ['$dateTri', maintenant] } }] },
+      },
+    },
+    { $sort: { dateTriAbsente: 1, proximite: 1, nom: 1 } },
   ]);
   res.json({ items });
 });
