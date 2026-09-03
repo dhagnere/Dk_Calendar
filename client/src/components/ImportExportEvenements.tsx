@@ -21,11 +21,13 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
     try {
       const form = new FormData();
       form.append('fichier', fichier);
-      const res = await api.postForm<{ ok: boolean; created: number; updated: number; errors: string[] }>(
+      const res = await api.postForm<{ ok: boolean; created: number; doublons: number; errors: string[] }>(
         '/import/evenements',
         form
       );
-      setMessage(`${res.created} créé(s), ${res.updated} mis à jour, ${res.errors.length} ligne(s) ignorée(s)`);
+      setMessage(
+        `${res.created} créé(s), ${res.doublons} doublon(s) ignoré(s) (déjà présents, non modifiés), ${res.errors.length} ligne(s) ignorée(s)`
+      );
       onImported();
     } finally {
       setEnCours(false);

@@ -16,9 +16,14 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 export const importRouter = Router();
 
 /**
- * Importe (upsert) des événements depuis un fichier CSV. Un événement de plusieurs jours a une
- * ligne par jour occupé (même nom, même dateDeDebut/dateDeFin, mais dateClef différente) : l'upsert
- * se fait donc par eventId si présent, sinon par (nom, dateClef) pour ne pas écraser les autres jours.
+ * Importe des événements depuis un fichier CSV. Un événement de plusieurs jours a une ligne par
+ * jour occupé (même nom, même dateDeDebut/dateDeFin, mais dateClef différente) : l'identité d'une
+ * ligne se détermine donc par eventId si présent, sinon par (nom, dateClef).
+ *
+ * Seules les lignes correspondant à un événement qui n'existe pas encore sont créées. Une ligne
+ * dont l'identité correspond à un événement déjà présent (dans la base, ou déjà rencontré plus tôt
+ * dans le même fichier) est un doublon : elle est ignorée sans rien modifier, pour ne jamais écraser
+ * le statut, les validations ou toute autre donnée déjà saisie dans l'application.
  */
 importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (req, res) => {
   if (!req.file) {
@@ -29,17 +34,31 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
   const { rows, errors } = parseEventsCsv(req.file.buffer.toString('utf-8'));
 
   let created = 0;
-  let updated = 0;
+  let doublons = 0;
+  const clesVues = new Set<string>();
 
   for (const row of rows) {
+    const cle = row.eventId ? `id:${row.eventId}` : `nom:${row.nom}|date:${row.dateClef?.toISOString() ?? ''}`;
+
+    if (clesVues.has(cle)) {
+      doublons++;
+      continue;
+    }
+    clesVues.add(cle);
+
     const filter = row.eventId ? { eventId: row.eventId } : { nom: row.nom, dateClef: row.dateClef };
-    const result = await EventModel.updateOne(filter, { $set: row }, { upsert: true });
-    if (result.upsertedCount > 0) created++;
-    else updated++;
+    const existant = await EventModel.exists(filter);
+    if (existant) {
+      doublons++;
+      continue;
+    }
+
+    await EventModel.create(row);
+    created++;
   }
 
-  console.log(`[import] Événements : ${created} créés, ${updated} mis à jour, ${errors.length} lignes ignorées`);
-  res.json({ ok: true, created, updated, errors, total: rows.length });
+  console.log(`[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${errors.length} lignes ignorées`);
+  res.json({ ok: true, created, doublons, errors, total: rows.length });
 });
 
 /** Exporte tous les événements au format CSV. */
