@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
-import { Button, Card, Col, DatePicker, Modal, Row, Select, Typography } from 'antd';
+import { Button, Card, Col, DatePicker, Modal, Row, Select, Switch, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
@@ -118,6 +118,7 @@ export default function Calendrier() {
   const [statut, setStatut] = useState('ALL');
   const [type, setType] = useState('ALL');
   const [avecEvenementsPasses, setAvecEvenementsPasses] = useState(false);
+  const [avecEvenementsArchives, setAvecEvenementsArchives] = useState(false);
   const [options, setOptions] = useState<OptionsFiltres>({ quartiers: [], statuts: [], types: [] });
 
   const charger = async () => {
@@ -126,6 +127,7 @@ export default function Calendrier() {
     if (statut !== 'ALL') params.set('statut', statut);
     if (type !== 'ALL') params.set('type', type);
     if (avecEvenementsPasses) params.set('avecEvenementsPasses', 'true');
+    if (avecEvenementsArchives) params.set('avecEvenementsArchives', 'true');
     const data = await api.get<{ items: Evenement[] }>(`/evenements?${params.toString()}`);
     setEvenements(data.items);
     const s = await api.get<{
@@ -146,7 +148,7 @@ export default function Calendrier() {
   useEffect(() => {
     charger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quartier, statut, type, avecEvenementsPasses]);
+  }, [quartier, statut, type, avecEvenementsPasses, avecEvenementsArchives]);
 
   const jours = useMemo(() => {
     const premier = new Date(mois.getFullYear(), mois.getMonth(), 1);
@@ -173,11 +175,6 @@ export default function Calendrier() {
       return j >= new Date(debut.getFullYear(), debut.getMonth(), debut.getDate()) &&
         j <= new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
     });
-
-  const archiverPasses = async () => {
-    await api.post('/evenements/archiver-passes');
-    charger();
-  };
 
   const validerUnClic = async (id: string) => {
     await api.post(`/evenements/${id}/valider`, {});
@@ -209,7 +206,12 @@ export default function Calendrier() {
           />
         </Boite>
         <Boite>
-          {estAdministrateur && <Button onClick={archiverPasses}>Archiver les événements passés</Button>}
+          <Switch
+            checked={avecEvenementsArchives}
+            onChange={setAvecEvenementsArchives}
+            checkedChildren="Événements archivés visibles"
+            unCheckedChildren="Événements archivés masqués"
+          />
           <ImportExportEvenements onImported={charger} />
         </Boite>
       </div>

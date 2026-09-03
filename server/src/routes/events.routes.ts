@@ -8,20 +8,36 @@ export const eventsRouter = Router();
 /** Année à partir de laquelle les événements sont chargés par défaut (voir GET /evenements). */
 const ANNEE_PLANCHER_PAR_DEFAUT = 2024;
 
+/** Date de référence pour savoir si un événement est terminé : dateDeFin, sinon dateDeDebut, sinon dateClef. */
+const DATE_FIN_EFFECTIVE = { $ifNull: ['$dateDeFin', { $ifNull: ['$dateDeDebut', '$dateClef'] }] };
+
 /**
  * Liste des événements, avec filtres optionnels (quartier, statut, nature, type, recherche).
  *
  * Par souci de rapidité, seuls les événements entre le 1er janvier ANNEE_PLANCHER_PAR_DEFAUT et le
  * 31 décembre de l'année suivant l'année en cours sont renvoyés par défaut. Passer
  * `avecEvenementsPasses=true` retire cette borne basse pour inclure aussi tout l'historique
- * antérieur (bouton « Afficher les événements passés » côté client). Un événement sans aucune date
- * (ni dateDeDebut ni dateClef) est toujours renvoyé, quel que soit ce paramètre.
+ * antérieur. Un événement sans aucune date (ni dateDeDebut ni dateClef) est toujours renvoyé, quel
+ * que soit ce paramètre.
+ *
+ * Tout événement déjà terminé (date de fin passée) est automatiquement validé et considéré
+ * « archivé » : plus besoin de déclencher cela manuellement. Par défaut ces événements archivés sont
+ * masqués ; passer `avecEvenementsArchives=true` les inclut à nouveau (déclencheur côté client).
  */
 eventsRouter.get('/', async (req, res) => {
-  const { quartier, statut, nature, type, searchTerm, avecEvenementsPasses } = req.query as Record<
-    string,
-    string | undefined
-  >;
+  const { quartier, statut, nature, type, searchTerm, avecEvenementsPasses, avecEvenementsArchives } =
+    req.query as Record<string, string | undefined>;
+
+  const maintenant = new Date();
+
+  // Valide et archive automatiquement tout événement dont la date de fin est déjà passée.
+  await EventModel.updateMany(
+    {
+      $expr: { $and: [{ $ne: [DATE_FIN_EFFECTIVE, null] }, { $lt: [DATE_FIN_EFFECTIVE, maintenant] }] },
+      $or: [{ validationTechnique: false }, { validationPolitique: false }],
+    },
+    { statut: 'Validée', validationTechnique: true, validationPolitique: true }
+  );
 
   const filter: Record<string, unknown> = {};
   if (quartier && quartier !== 'ALL') filter.quartier = quartier;
@@ -38,7 +54,7 @@ eventsRouter.get('/', async (req, res) => {
     filter.statut = statut;
   }
 
-  const anneeActuelle = new Date().getFullYear();
+  const anneeActuelle = maintenant.getFullYear();
   const finPeriode = new Date(anneeActuelle + 2, 0, 1); // borne haute exclusive : fin de l'année en cours + 1 an
   const contraintesDate: Record<string, unknown> = { $lt: finPeriode };
   if (avecEvenementsPasses !== 'true') {
@@ -49,11 +65,13 @@ eventsRouter.get('/', async (req, res) => {
   // en repli) est la plus proche de la date du jour arrive en premier, puis on s'éloigne
   // progressivement (dans le passé comme dans le futur) vers l'événement le plus lointain. Les
   // événements sans aucune date sont placés en dernier.
-  const maintenant = new Date();
   const items = await EventModel.aggregate([
     { $match: filter },
-    { $addFields: { dateTri: { $ifNull: ['$dateDeDebut', '$dateClef'] } } },
+    { $addFields: { dateTri: { $ifNull: ['$dateDeDebut', '$dateClef'] }, dateFin: DATE_FIN_EFFECTIVE } },
     { $match: { $or: [{ dateTri: null }, { dateTri: contraintesDate }] } },
+    ...(avecEvenementsArchives === 'true'
+      ? []
+      : [{ $match: { $or: [{ dateFin: null }, { dateFin: { $gte: maintenant } }] } }]),
     { $addFields: { dateTriAbsente: { $cond: [{ $eq: ['$dateTri', null] }, 1, 0] } } },
     {
       $addFields: {
@@ -228,16 +246,4 @@ eventsRouter.post('/valider-serie', requireAdmin, async (req, res) => {
   );
 
   res.json({ ok: true, validated: result.modifiedCount, total: result.matchedCount });
-});
-
-/** Archive automatiquement (valide) tous les événements dont la date de fin est passée. */
-eventsRouter.post('/archiver-passes', requireAdmin, async (_req, res) => {
-  const result = await EventModel.updateMany(
-    {
-      dateDeFin: { $lt: new Date() },
-      $or: [{ validationTechnique: false }, { validationPolitique: false }],
-    },
-    { statut: 'Validée', validationTechnique: true, validationPolitique: true }
-  );
-  res.json({ ok: true, archived: result.modifiedCount });
 });

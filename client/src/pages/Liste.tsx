@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, Input, Popconfirm, Select, Table, Typography, type TableColumnsType } from 'antd';
+import { Button, Checkbox, Input, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,7 @@ export default function Liste() {
   const [quartier, setQuartier] = useState('ALL');
   const [statut, setStatut] = useState('ALL');
   const [avecEvenementsPasses, setAvecEvenementsPasses] = useState(false);
+  const [avecEvenementsArchives, setAvecEvenementsArchives] = useState(false);
   const [options, setOptions] = useState<{ quartiers: { label: string }[]; statuts: { label: string }[] }>({
     quartiers: [],
     statuts: [],
@@ -31,6 +32,7 @@ export default function Liste() {
       if (quartier !== 'ALL') params.set('quartier', quartier);
       if (statut !== 'ALL') params.set('statut', statut);
       if (avecEvenementsPasses) params.set('avecEvenementsPasses', 'true');
+      if (avecEvenementsArchives) params.set('avecEvenementsArchives', 'true');
       const data = await api.get<{ items: Evenement[] }>(`/evenements?${params.toString()}`);
       setEvenements(data.items);
     } finally {
@@ -50,7 +52,7 @@ export default function Liste() {
     const t = setTimeout(charger, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recherche, quartier, statut, avecEvenementsPasses]);
+  }, [recherche, quartier, statut, avecEvenementsPasses, avecEvenementsArchives]);
 
   const toggleValidation = async (id: string, champ: 'validationTechnique' | 'validationPolitique', valeur: boolean) => {
     await api.post(`/evenements/${id}/validations`, { [champ]: valeur });
@@ -152,6 +154,12 @@ export default function Liste() {
         >
           {avecEvenementsPasses ? 'Masquer les événements passés' : 'Afficher les événements passés'}
         </Button>
+        <Switch
+          checked={avecEvenementsArchives}
+          onChange={setAvecEvenementsArchives}
+          checkedChildren="Événements archivés visibles"
+          unCheckedChildren="Événements archivés masqués"
+        />
         <div style={{ marginLeft: 'auto' }}>
           <ImportExportEvenements onImported={charger} />
         </div>
