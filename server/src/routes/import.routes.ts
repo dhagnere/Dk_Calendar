@@ -46,10 +46,14 @@ function cleIdentite(e: {
  * jour occupé (même nom, même dateDeDebut/dateDeFin, mais dateClef différente) : l'identité d'une
  * ligne se détermine donc par eventId si présent, sinon par (nom, dateClef).
  *
- * Seules les lignes correspondant à un événement qui n'existe pas encore sont créées. Une ligne
- * dont l'identité correspond à un événement déjà présent (dans la base, ou déjà rencontré plus tôt
- * dans le même fichier) est un doublon : elle est ignorée sans rien modifier, pour ne jamais écraser
- * le statut, les validations ou toute autre donnée déjà saisie dans l'application.
+ * Trois filtres s'appliquent avant toute écriture en base :
+ * - une ligne au statut « Brouillon » n'est jamais importée (ni créée, ni utilisée pour mettre à
+ *   jour quoi que ce soit) ;
+ * - une ligne dont l'identité correspond à un événement déjà présent (en base, ou déjà rencontrée
+ *   plus tôt dans le même fichier) est un doublon : elle est ignorée sans rien modifier, pour ne
+ *   jamais écraser le statut, les validations ou toute autre donnée déjà saisie dans l'application ;
+ * - seules les lignes qui passent ces deux filtres, c'est-à-dire les véritables nouvelles
+ *   manifestations, sont créées — elles deviennent alors visibles dans le Calendrier et la Liste.
  *
  * Les identités déjà en base sont chargées en une seule requête et les nouveaux événements insérés
  * en un seul lot (au lieu de deux allers-retours base par ligne) : avec un gros fichier, la version
@@ -70,8 +74,14 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
     const clesVues = new Set<string>();
     const aCreer: typeof rows = [];
     let doublons = 0;
+    let brouillonsIgnores = 0;
 
     for (const row of rows) {
+      if (row.statut === 'Brouillon') {
+        brouillonsIgnores++;
+        continue;
+      }
+
       const cle = cleIdentite(row);
       if (clesVues.has(cle) || clesExistantes.has(cle)) {
         doublons++;
@@ -86,8 +96,10 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
     }
 
     const created = aCreer.length;
-    console.log(`[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${errors.length} lignes ignorées`);
-    res.json({ ok: true, created, doublons, errors, total: rows.length });
+    console.log(
+      `[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${brouillonsIgnores} brouillons ignorés, ${errors.length} lignes ignorées`
+    );
+    res.json({ ok: true, created, doublons, brouillonsIgnores, errors, total: rows.length });
   } catch (err) {
     console.error("[import] Échec de l'import événements :", err);
     res.status(500).json({

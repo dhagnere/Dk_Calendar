@@ -23,11 +23,14 @@ export function ImportExportEvenements({ onImported }: { onImported: () => void 
     try {
       const form = new FormData();
       form.append('fichier', fichier);
-      const res = await api.postForm<{ ok: boolean; created: number; doublons: number; errors: string[] }>(
-        '/import/evenements',
-        form
-      );
-      let texte = `${res.created} créé(s), ${res.doublons} doublon(s) ignoré(s) (déjà présents, non modifiés), ${res.errors.length} ligne(s) ignorée(s)`;
+      const res = await api.postForm<{
+        ok: boolean;
+        created: number;
+        doublons: number;
+        brouillonsIgnores: number;
+        errors: string[];
+      }>('/import/evenements', form);
+      let texte = `${res.created} créé(s), ${res.doublons} doublon(s) ignoré(s) (déjà présents, non modifiés), ${res.brouillonsIgnores} brouillon(s) ignoré(s), ${res.errors.length} ligne(s) ignorée(s)`;
       if (res.errors.length > 0) {
         texte += ` : ${res.errors.slice(0, 5).join(' ; ')}${res.errors.length > 5 ? '…' : ''}`;
       }
