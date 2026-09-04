@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Calendrier from './pages/Calendrier';
 import Liste from './pages/Liste';
 import Carte from './pages/Carte';
+import Conflits from './pages/Conflits';
 import Comptes from './pages/Comptes';
 import Demandes from './pages/Demandes';
 
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/" element={<Calendrier />} />
         <Route path="/liste" element={<Liste />} />
         <Route path="/carte" element={<Carte />} />
+        <Route path="/conflits" element={<Conflits />} />
         <Route element={<RequireAdmin />}>
           <Route path="/comptes" element={<Comptes />} />
           <Route path="/demandes" element={<Demandes />} />

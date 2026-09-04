@@ -8,6 +8,7 @@ import {
   TeamOutlined,
   UnorderedListOutlined,
   UserAddOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import { LOGO_DUNKERQUE_CUD } from '../logos';
@@ -74,6 +75,7 @@ export function AppLayout() {
     { key: '/', label: 'Calendrier', icone: <CalendarOutlined /> },
     { key: '/liste', label: 'Liste', icone: <UnorderedListOutlined /> },
     { key: '/carte', label: 'Carte', icone: <EnvironmentOutlined /> },
+    { key: '/conflits', label: 'Conflits', icone: <WarningOutlined /> },
     ...(estAdministrateur
       ? [
           { key: '/comptes', label: 'Comptes', icone: <TeamOutlined /> },
