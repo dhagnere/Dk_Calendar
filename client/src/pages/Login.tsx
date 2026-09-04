@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Button, Card, Divider, Image, Input, Typography } from 'antd';
+import { Button, Card, Image, Input, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { LOGO_CUD, LOGO_DUNKERQUE } from '../logos';
+import { LOGO_DUNKERQUE_CUD } from '../logos';
 
 const { Title, Text, Link } = Typography;
 
@@ -98,10 +98,8 @@ export default function Login() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5', padding: 16 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', maxWidth: 380 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-          <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" height={40} preview={false} />
-          <Divider orientation="vertical" style={{ height: 36, margin: 0 }} />
-          <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" height={40} preview={false} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Image src={LOGO_DUNKERQUE_CUD} alt="Dunkerque / Communauté urbaine" height={48} preview={false} />
         </div>
         <Card>
           <Title level={4} style={{ marginTop: 0 }}>

@@ -4,11 +4,11 @@ import { estValide, type Evenement } from '../types';
 import { formatTitreEvenement } from './formatTitre';
 import { formatDate, majusculeInitiale } from './formatDate';
 import { formatDuree } from './formatDuree';
-import { chargerLogosPourPdf, type LogosPdf } from './logosPdf';
+import { chargerLogoPourPdf, type LogoCharge } from './logosPdf';
 
 const TITRE_APP = 'Calendrier Événements Dunkerque';
 const MARGE = 40;
-const HAUTEUR_LOGO = 30;
+const HAUTEUR_LOGO = 28;
 
 /**
  * jspdf-autotable pose `finalY` sur `doc.lastAutoTable` en effet de bord (non typé dans ses .d.ts,
@@ -19,24 +19,27 @@ function finalYDe(doc: jsPDF): number {
   return (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? MARGE;
 }
 
-/** En-tête commun : logos officiels, titre de l'app, sous-titre, et date/heure d'impression. */
-function entete(doc: jsPDF, sousTitre: string, logos: LogosPdf): number {
+/**
+ * En-tête commun : titre de l'app et sous-titre à gauche, logo officiel dans le coin haut droit
+ * (comme dans l'UI) avec la date/heure d'impression juste en dessous.
+ */
+function entete(doc: jsPDF, sousTitre: string, logo: LogoCharge | null): number {
   const largeurPage = doc.internal.pageSize.getWidth();
-  let xTexte = MARGE;
-
-  for (const logo of [logos.dunkerque, logos.cud]) {
-    if (!logo) continue;
-    const largeurLogo = HAUTEUR_LOGO * (logo.largeur / logo.hauteur || 1);
-    doc.addImage(logo.dataUrl, 'PNG', xTexte, MARGE - 22, largeurLogo, HAUTEUR_LOGO);
-    xTexte += largeurLogo + 12;
-  }
 
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(TITRE_APP, xTexte, MARGE - 4);
+  doc.text(TITRE_APP, MARGE, MARGE - 4);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
-  doc.text(sousTitre, xTexte, MARGE + 16);
+  doc.text(sousTitre, MARGE, MARGE + 16);
+
+  let yApresLogo = MARGE - 4;
+  if (logo) {
+    const largeurLogo = HAUTEUR_LOGO * (logo.largeur / logo.hauteur || 1);
+    const yLogo = MARGE - 24;
+    doc.addImage(logo.dataUrl, 'PNG', largeurPage - MARGE - largeurLogo, yLogo, largeurLogo, HAUTEUR_LOGO);
+    yApresLogo = yLogo + HAUTEUR_LOGO + 12;
+  }
 
   const maintenant = new Date();
   const texteImpression = `Imprimé le ${maintenant.toLocaleDateString('fr-FR')} à ${maintenant.toLocaleTimeString('fr-FR', {
@@ -45,7 +48,7 @@ function entete(doc: jsPDF, sousTitre: string, logos: LogosPdf): number {
   })}`;
   doc.setFontSize(9);
   doc.setTextColor(140);
-  doc.text(texteImpression, largeurPage - MARGE, MARGE - 22, { align: 'right' });
+  doc.text(texteImpression, largeurPage - MARGE, yApresLogo, { align: 'right' });
   doc.setTextColor(0);
 
   const yLigne = MARGE + 26;
@@ -60,14 +63,14 @@ function entete(doc: jsPDF, sousTitre: string, logos: LogosPdf): number {
  * événement, avec ses champs comme dans la pop-up du Calendrier), utile pour imprimer la journée.
  */
 export async function exporterFicheJourPdf(jour: Date, evenements: Evenement[]): Promise<void> {
-  const logos = await chargerLogosPourPdf();
+  const logo = await chargerLogoPourPdf();
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const largeurPage = doc.internal.pageSize.getWidth();
 
   const titreJour = majusculeInitiale(
     jour.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   );
-  let y = entete(doc, titreJour, logos);
+  let y = entete(doc, titreJour, logo);
 
   if (evenements.length === 0) {
     doc.setFontSize(11);
@@ -119,9 +122,9 @@ export type LigneExportPdf = { type: 'entete'; label: string } | { type: 'evenem
 
 /** Exporte en PDF la Liste telle qu'affichée à l'écran (mêmes filtres, mêmes en-têtes de semaine). */
 export async function exporterListePdf(lignes: LigneExportPdf[]): Promise<void> {
-  const logos = await chargerLogosPourPdf();
+  const logo = await chargerLogoPourPdf();
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
-  const y = entete(doc, 'Liste des événements', logos);
+  const y = entete(doc, 'Liste des événements', logo);
 
   const body = lignes.map((ligne) => {
     if (ligne.type === 'entete') {

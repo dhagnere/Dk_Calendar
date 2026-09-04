@@ -10,7 +10,7 @@ import {
   UserAddOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
-import { LOGO_CUD, LOGO_DUNKERQUE } from '../logos';
+import { LOGO_DUNKERQUE_CUD } from '../logos';
 
 const { Header, Content } = Layout;
 const { Text } = Typography;
@@ -104,15 +104,6 @@ export function AppLayout() {
         }}
       >
         <Space size={mobile ? 'small' : 'large'} align="center" wrap>
-          <Space size="middle" align="center">
-            <Image src={LOGO_DUNKERQUE} alt="Ville de Dunkerque" height={mobile ? 28 : 36} preview={false} />
-            {!mobile && (
-              <>
-                <Divider orientation="vertical" style={{ height: 32, margin: 0 }} />
-                <Image src={LOGO_CUD} alt="Communauté urbaine de Dunkerque" height={36} preview={false} />
-              </>
-            )}
-          </Space>
           <Text strong style={{ fontSize: mobile ? 15 : 18, whiteSpace: 'nowrap' }}>
             Calendrier Événements
           </Text>
@@ -131,12 +122,16 @@ export function AppLayout() {
           )}
         </Space>
         {mobile ? (
-          <Button icon={<MenuOutlined />} onClick={() => setMenuOuvert(true)} aria-label="Menu" />
+          <Space size="small" align="center">
+            <Image src={LOGO_DUNKERQUE_CUD} alt="Dunkerque / Communauté urbaine" height={24} preview={false} />
+            <Button icon={<MenuOutlined />} onClick={() => setMenuOuvert(true)} aria-label="Menu" />
+          </Space>
         ) : (
-          <Space style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <Space style={{ flexShrink: 0, whiteSpace: 'nowrap' }} align="center">
             {!estAdministrateur && <Tag color="blue">Consultation seule</Tag>}
             <Text type="secondary">{session.nom}</Text>
             <Button onClick={() => deconnexion()}>Déconnexion</Button>
+            <Image src={LOGO_DUNKERQUE_CUD} alt="Dunkerque / Communauté urbaine" height={36} preview={false} />
           </Space>
         )}
       </Header>
