@@ -20,18 +20,19 @@ function cleJour(d: Date): string {
  * Jour(s) occupé(s) par un événement : sa dateClef si présente (cas normal, une ligne par jour), sinon
  * chaque jour de la plage dateDeDebut→dateDeFin en repli (événement créé manuellement, sans dateClef).
  */
+const MAX_JOURS_PLAGE = 366;
+
 function joursDe(e: Evenement): string[] {
   if (e.dateClef) return [cleJour(new Date(e.dateClef))];
   if (!e.dateDeDebut) return [];
   const debut = new Date(e.dateDeDebut);
   const fin = e.dateDeFin ? new Date(e.dateDeFin) : debut;
+  if (Number.isNaN(debut.getTime()) || Number.isNaN(fin.getTime())) return [];
   const jours: string[] = [];
-  for (
-    const d = new Date(debut.getFullYear(), debut.getMonth(), debut.getDate());
-    d <= fin;
-    d.setDate(d.getDate() + 1)
-  ) {
+  const d = new Date(debut.getFullYear(), debut.getMonth(), debut.getDate());
+  while (d <= fin && jours.length < MAX_JOURS_PLAGE) {
     jours.push(cleJour(d));
+    d.setDate(d.getDate() + 1);
   }
   return jours;
 }
