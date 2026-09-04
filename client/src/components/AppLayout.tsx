@@ -104,6 +104,7 @@ export function AppLayout() {
         }}
       >
         <Space size={mobile ? 'small' : 'large'} align="center" wrap>
+          <Image src={LOGO_DUNKERQUE_CUD} alt="Dunkerque / Communauté urbaine" height={mobile ? 28 : 36} preview={false} />
           <Text strong style={{ fontSize: mobile ? 15 : 18, whiteSpace: 'nowrap' }}>
             Calendrier Événements
           </Text>
@@ -122,16 +123,12 @@ export function AppLayout() {
           )}
         </Space>
         {mobile ? (
-          <Space size="small" align="center">
-            <Image src={LOGO_DUNKERQUE_CUD} alt="Dunkerque / Communauté urbaine" height={24} preview={false} />
-            <Button icon={<MenuOutlined />} onClick={() => setMenuOuvert(true)} aria-label="Menu" />
-          </Space>
+          <Button icon={<MenuOutlined />} onClick={() => setMenuOuvert(true)} aria-label="Menu" />
         ) : (
           <Space style={{ flexShrink: 0, whiteSpace: 'nowrap' }} align="center">
             {!estAdministrateur && <Tag color="blue">Consultation seule</Tag>}
             <Text type="secondary">{session.nom}</Text>
             <Button onClick={() => deconnexion()}>Déconnexion</Button>
-            <Image src={LOGO_DUNKERQUE_CUD} alt="Dunkerque / Communauté urbaine" height={36} preview={false} />
           </Space>
         )}
       </Header>
