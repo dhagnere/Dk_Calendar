@@ -8,6 +8,7 @@ import Carte from './pages/Carte';
 import Conflits from './pages/Conflits';
 import Comptes from './pages/Comptes';
 import Demandes from './pages/Demandes';
+import Sauvegardes from './pages/Sauvegardes';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route element={<RequireAdmin />}>
           <Route path="/comptes" element={<Comptes />} />
           <Route path="/demandes" element={<Demandes />} />
+          <Route path="/sauvegardes" element={<Sauvegardes />} />
         </Route>
       </Route>
     </Routes>

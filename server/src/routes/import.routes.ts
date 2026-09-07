@@ -10,6 +10,7 @@ import {
   parseUsersCsv,
   stringifyUsersCsv,
 } from '../lib/csv.js';
+import { creerSauvegarde } from '../lib/backup.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -67,6 +68,8 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
 
   try {
     const { rows, errors } = parseEventsCsv(req.file.buffer.toString('utf-8'));
+
+    await creerSauvegarde('avant-import-evenements');
 
     const existants = await EventModel.find({}, { eventId: 1, nom: 1, dateClef: 1, dateDeDebut: 1 }).lean();
     const clesExistantes = new Set(existants.map(cleIdentite));
@@ -127,6 +130,8 @@ importRouter.post('/utilisateurs', requireAdmin, upload.single('fichier'), async
 
   try {
     const { rows, errors } = parseUsersCsv(req.file.buffer.toString('utf-8'));
+
+    await creerSauvegarde('avant-import-utilisateurs');
 
     let created = 0;
     let updated = 0;

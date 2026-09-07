@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Divider, Drawer, Grid, Image, Layout, Space, Tag, Typography } from 'antd';
 import {
   CalendarOutlined,
+  CloudUploadOutlined,
   EnvironmentOutlined,
   MenuOutlined,
   TeamOutlined,
@@ -80,6 +81,7 @@ export function AppLayout() {
       ? [
           { key: '/comptes', label: 'Comptes', icone: <TeamOutlined /> },
           { key: '/demandes', label: "Demandes d'accès", icone: <UserAddOutlined /> },
+          { key: '/sauvegardes', label: 'Sauvegardes', icone: <CloudUploadOutlined /> },
         ]
       : []),
   ];

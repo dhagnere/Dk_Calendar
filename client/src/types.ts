@@ -40,6 +40,14 @@ export function estValide(e: Pick<Evenement, 'validationTechnique' | 'validation
   return e.validationTechnique && e.validationPolitique;
 }
 
+export interface Sauvegarde {
+  _id: string;
+  type: 'quotidienne' | 'manuelle' | 'avant-import-evenements' | 'avant-import-utilisateurs' | 'avant-restauration';
+  nombreEvenements: number;
+  nombreUtilisateurs: number;
+  createdAt: string;
+}
+
 export interface DemandeAcces {
   _id: string;
   nom: string;
