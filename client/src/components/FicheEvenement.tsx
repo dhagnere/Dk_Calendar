@@ -2,7 +2,7 @@ import { Button, Card, Checkbox, Descriptions, Typography } from 'antd';
 import { estValide, type Evenement } from '../types';
 import { formatDate } from '../lib/formatDate';
 import { formatTitreEvenement } from '../lib/formatTitre';
-import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
+import { COULEUR_DATE_CLEF, COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ValidationBadge } from './ValidationBadge';
 
 interface Props {
@@ -32,7 +32,11 @@ export function FicheEvenement({ evenement, estAdministrateur, onToggleValidatio
     },
   ];
 
-  const couleurBordure = estValide(evenement) ? COULEUR_VALIDE : COULEUR_NON_VALIDE;
+  const couleurBordure = evenement.validParDateClef
+    ? COULEUR_DATE_CLEF
+    : estValide(evenement)
+      ? COULEUR_VALIDE
+      : COULEUR_NON_VALIDE;
 
   return (
     <Card

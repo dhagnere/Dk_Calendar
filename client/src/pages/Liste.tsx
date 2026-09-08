@@ -5,6 +5,7 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Evenement } from '../types';
 import { ValidationBadge } from '../components/ValidationBadge';
+import { COULEUR_DATE_CLEF } from '../lib/validationColors';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
 import { formatDuree } from '../lib/formatDuree';
@@ -132,8 +133,8 @@ export default function Liste() {
     charger();
   };
 
-  const validerUnClic = async (id: string) => {
-    await api.post(`/evenements/${id}/valider`, {});
+  const marquerDateClef = async (id: string) => {
+    await api.post(`/evenements/${id}/valider`, { viaPastilleDateClef: true });
     charger();
   };
 
@@ -182,8 +183,17 @@ export default function Liste() {
                 >
                   Pol.
                 </Checkbox>
-                <Button size="small" onClick={() => validerUnClic(e._id)}>
-                  Valider
+                <Button
+                  size="small"
+                  type={e.validParDateClef ? 'primary' : 'default'}
+                  style={
+                    e.validParDateClef
+                      ? { background: COULEUR_DATE_CLEF, borderColor: COULEUR_DATE_CLEF }
+                      : { color: COULEUR_DATE_CLEF, borderColor: COULEUR_DATE_CLEF }
+                  }
+                  onClick={() => marquerDateClef(e._id)}
+                >
+                  Date Clef
                 </Button>
                 <Popconfirm
                   title="Supprimer cet événement ?"

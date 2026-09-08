@@ -5,7 +5,7 @@ import { FilePdfOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { estValide, type Evenement } from '../types';
-import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
+import { COULEUR_DATE_CLEF, COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
 import { FicheEvenement } from '../components/FicheEvenement';
 import { formatTitreEvenement } from '../lib/formatTitre';
@@ -37,6 +37,7 @@ function memeJour(a: Date, b: Date): boolean {
 }
 
 function couleurValidation(e: Evenement): string {
+  if (e.validParDateClef) return COULEUR_DATE_CLEF;
   return estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE;
 }
 
@@ -318,6 +319,10 @@ export default function Calendrier() {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Pastille couleur={COULEUR_NON_VALIDE} />
           Non validée
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Pastille couleur={COULEUR_DATE_CLEF} />
+          Date Clef
         </span>
       </div>
 
