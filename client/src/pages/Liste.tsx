@@ -91,10 +91,15 @@ export default function Liste() {
   const [recherche, setRecherche] = useState('');
   const [quartier, setQuartier] = useState('ALL');
   const [statut, setStatut] = useState('ALL');
-  const [avecEvenementsPasses, setAvecEvenementsPasses] = useState(false);
+  const [nature, setNature] = useState('ALL');
   const [avecEvenementsArchives, setAvecEvenementsArchives] = useState(false);
-  const [options, setOptions] = useState<{ quartiers: { label: string }[]; statuts: { label: string }[] }>({
+  const [options, setOptions] = useState<{
+    quartiers: { label: string }[];
+    natures: { label: string }[];
+    statuts: { label: string }[];
+  }>({
     quartiers: [],
+    natures: [],
     statuts: [],
   });
 
@@ -105,7 +110,7 @@ export default function Liste() {
       if (recherche) params.set('searchTerm', recherche);
       if (quartier !== 'ALL') params.set('quartier', quartier);
       if (statut !== 'ALL') params.set('statut', statut);
-      if (avecEvenementsPasses) params.set('avecEvenementsPasses', 'true');
+      if (nature !== 'ALL') params.set('nature', nature);
       if (avecEvenementsArchives) params.set('avecEvenementsArchives', 'true');
       const data = await api.get<{ items: Evenement[] }>(`/evenements?${params.toString()}`);
       setEvenements(data.items);
@@ -126,7 +131,7 @@ export default function Liste() {
     const t = setTimeout(charger, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recherche, quartier, statut, avecEvenementsPasses, avecEvenementsArchives]);
+  }, [recherche, quartier, statut, nature, avecEvenementsArchives]);
 
   const toggleValidation = async (id: string, champ: 'validationTechnique' | 'validationPolitique', valeur: boolean) => {
     await api.post(`/evenements/${id}/validations`, { [champ]: valeur });
@@ -266,19 +271,15 @@ export default function Liste() {
             ]}
           />
         </div>
-        <Button
-          block={mobile}
-          type={avecEvenementsPasses ? 'primary' : 'default'}
-          onClick={() => setAvecEvenementsPasses((v) => !v)}
-        >
-          {mobile
-            ? avecEvenementsPasses
-              ? 'Masquer le passé'
-              : 'Afficher le passé'
-            : avecEvenementsPasses
-              ? 'Masquer les événements passés'
-              : 'Afficher les événements passés'}
-        </Button>
+        <div style={{ minWidth: mobile ? '100%' : 200, flex: mobile ? '1 0 100%' : undefined }}>
+          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Nature</div>
+          <Select
+            value={nature}
+            onChange={setNature}
+            style={{ width: '100%' }}
+            options={[{ value: 'ALL', label: 'Toutes' }, ...options.natures.map((n) => ({ value: n.label, label: n.label }))]}
+          />
+        </div>
         <Switch
           checked={avecEvenementsArchives}
           onChange={setAvecEvenementsArchives}
