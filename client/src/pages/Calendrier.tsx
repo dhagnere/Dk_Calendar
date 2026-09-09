@@ -172,14 +172,16 @@ export default function Calendrier() {
     evenements.filter((e) => {
       // Cas normal : la ligne représente précisément ce jour (dateClef).
       if (e.dateClef) return memeJour(new Date(e.dateClef), jour);
-      // Repli pour un événement sans dateClef (ex: créé manuellement) : chevauchement de plage.
+      // Repli pour un événement sans dateClef (ex: import brut sans cette colonne, ou événement créé
+      // manuellement) : chevauchement de plage, en comparant uniquement les jours calendaires (minuit
+      // à minuit) pour éviter tout décalage d'heure qui exclurait à tort le jour de l'événement.
       if (!e.dateDeDebut) return false;
       const debut = new Date(e.dateDeDebut);
       const fin = e.dateDeFin ? new Date(e.dateDeFin) : debut;
-      const j = new Date(jour);
-      j.setHours(12, 0, 0, 0);
-      return j >= new Date(debut.getFullYear(), debut.getMonth(), debut.getDate()) &&
-        j <= new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
+      const jourMinuit = new Date(jour.getFullYear(), jour.getMonth(), jour.getDate());
+      const debutMinuit = new Date(debut.getFullYear(), debut.getMonth(), debut.getDate());
+      const finMinuit = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
+      return jourMinuit >= debutMinuit && jourMinuit <= finMinuit;
     });
 
   const validerUnClic = async (id: string) => {
