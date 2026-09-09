@@ -46,7 +46,7 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
 
     await creerSauvegarde('avant-import-evenements');
 
-    const existants = await EventModel.find({}, { eventId: 1, nom: 1, dateClef: 1, dateDeDebut: 1 }).lean();
+    const existants = await EventModel.find({}, { eventId: 1, nom: 1, lieu: 1, dateClef: 1, dateDeDebut: 1 }).lean();
     const clesExistantes = new Set(existants.map(cleIdentite));
 
     const clesVues = new Set<string>();
