@@ -105,6 +105,18 @@ export default function Conflits() {
     charger();
   };
 
+  const supprimer = async (id: string) => {
+    await api.delete(`/evenements/${id}`);
+    setEvenementOuvertId(null);
+    charger();
+  };
+
+  const changerDates = async (id: string, dateDeDebut: string, dateDeFin: string | null) => {
+    await api.post(`/evenements/${id}/dates`, { dateDeDebut, dateDeFin });
+    setEvenementOuvertId(null);
+    charger();
+  };
+
   const joursEnConflit = useMemo<JourConflit[]>(() => {
     const aujourdhui = new Date();
     aujourdhui.setHours(0, 0, 0, 0);
@@ -258,6 +270,8 @@ export default function Conflits() {
             estAdministrateur={estAdministrateur}
             onToggleValidation={toggleValidation}
             onValider={validerUnClic}
+            onSupprimer={supprimer}
+            onChangerDates={changerDates}
           />
         )}
       </Modal>

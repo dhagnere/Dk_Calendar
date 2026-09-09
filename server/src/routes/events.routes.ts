@@ -293,27 +293,62 @@ eventsRouter.post('/:id/validations', requireAdmin, async (req, res) => {
   res.json({ ok: true, item: updated });
 });
 
-/** Met à jour les dates de début/fin d'un événement. */
+/** Nombre maximal de jours acceptés pour la plage d'un report de date (garde-fou). */
+const MAX_JOURS_REPORT = 366;
+
+/**
+ * Change les dates d'un événement (report). Un événement sur plusieurs jours ayant une ligne par
+ * jour (dateClef), reporter la date recrée l'intégralité de la série sur les nouveaux jours : toutes
+ * les lignes de l'ancienne série (voir filtreSerie) sont supprimées puis remplacées par une ligne par
+ * jour de la nouvelle plage, en conservant tous les autres champs (lieu, quartier, validations,
+ * etc.) tels qu'ils étaient. Les identifiants Mongo des nouvelles lignes sont donc différents de
+ * l'ancienne série.
+ */
 eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
-  const schema = z.object({ dateDeDebut: z.string().nullable(), dateDeFin: z.string().nullable() });
+  const schema = z.object({ dateDeDebut: z.string().min(1), dateDeFin: z.string().nullable() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ ok: false, message: 'Données invalides' });
     return;
   }
-  const updated = await EventModel.findByIdAndUpdate(
-    req.params.id,
-    {
-      dateDeDebut: parsed.data.dateDeDebut ? new Date(parsed.data.dateDeDebut) : null,
-      dateDeFin: parsed.data.dateDeFin ? new Date(parsed.data.dateDeFin) : null,
-    },
-    { new: true }
-  );
-  if (!updated) {
+
+  const cible = await EventModel.findById(req.params.id).lean();
+  if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
-  res.json({ ok: true, item: updated });
+
+  const nouveauDebut = new Date(parsed.data.dateDeDebut);
+  const nouveauFin = parsed.data.dateDeFin ? new Date(parsed.data.dateDeFin) : nouveauDebut;
+  if (Number.isNaN(nouveauDebut.getTime()) || Number.isNaN(nouveauFin.getTime()) || nouveauFin < nouveauDebut) {
+    res.status(400).json({ ok: false, message: 'Dates invalides' });
+    return;
+  }
+
+  const memeJour =
+    nouveauDebut.getFullYear() === nouveauFin.getFullYear() &&
+    nouveauDebut.getMonth() === nouveauFin.getMonth() &&
+    nouveauDebut.getDate() === nouveauFin.getDate();
+
+  const { _id, dateClef, dateDeDebut, dateDeFin, createdAt, updatedAt, __v, ...gabarit } = cible as Record<string, unknown>;
+
+  const nouvellesLignes: Record<string, unknown>[] = [];
+  for (
+    const d = new Date(nouveauDebut.getFullYear(), nouveauDebut.getMonth(), nouveauDebut.getDate());
+    d <= nouveauFin && nouvellesLignes.length < MAX_JOURS_REPORT;
+    d.setDate(d.getDate() + 1)
+  ) {
+    nouvellesLignes.push({
+      ...gabarit,
+      dateClef: new Date(d),
+      dateDeDebut: nouveauDebut,
+      dateDeFin: memeJour ? null : nouveauFin,
+    });
+  }
+
+  await EventModel.deleteMany(filtreSerie(cible));
+  const crees = await EventModel.insertMany(nouvellesLignes);
+  res.json({ ok: true, items: crees });
 });
 
 /**

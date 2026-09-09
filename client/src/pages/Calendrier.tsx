@@ -194,6 +194,16 @@ export default function Calendrier() {
     charger();
   };
 
+  const supprimer = async (id: string) => {
+    await api.delete(`/evenements/${id}`);
+    charger();
+  };
+
+  const changerDates = async (id: string, dateDeDebut: string, dateDeFin: string | null) => {
+    await api.post(`/evenements/${id}/dates`, { dateDeDebut, dateDeFin });
+    charger();
+  };
+
   const evenementsJourOuvert = jourSelectionne ? evenementsDuJour(jourSelectionne) : [];
 
   const telechargerFichePdf = async () => {
@@ -459,6 +469,8 @@ export default function Calendrier() {
               estAdministrateur={estAdministrateur}
               onToggleValidation={toggleValidation}
               onValider={validerUnClic}
+              onSupprimer={supprimer}
+              onChangerDates={changerDates}
             />
           ))}
         </div>
