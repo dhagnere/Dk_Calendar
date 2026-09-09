@@ -13,6 +13,7 @@ const LIBELLES_TYPE: Record<Sauvegarde['type'], { libelle: string; couleur: stri
   'avant-import-evenements': { libelle: 'Avant import événements', couleur: 'orange' },
   'avant-import-utilisateurs': { libelle: 'Avant import utilisateurs', couleur: 'orange' },
   'avant-restauration': { libelle: 'Avant restauration', couleur: 'red' },
+  'avant-fusion-doublons': { libelle: 'Avant fusion de doublons', couleur: 'orange' },
 };
 
 /** Formate une date ISO en "JJ/MM/AAAA à HH:MM" (locale fr-FR), ou "—" si absente/invalide. */

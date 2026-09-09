@@ -25,6 +25,7 @@ export interface Evenement {
   validationPolitique: boolean;
   validParDateClef: boolean;
   statutDimport: string;
+  createdAt?: string;
 }
 
 export interface Compte {
@@ -42,7 +43,13 @@ export function estValide(e: Pick<Evenement, 'validationTechnique' | 'validation
 
 export interface Sauvegarde {
   _id: string;
-  type: 'quotidienne' | 'manuelle' | 'avant-import-evenements' | 'avant-import-utilisateurs' | 'avant-restauration';
+  type:
+    | 'quotidienne'
+    | 'manuelle'
+    | 'avant-import-evenements'
+    | 'avant-import-utilisateurs'
+    | 'avant-restauration'
+    | 'avant-fusion-doublons';
   nombreEvenements: number;
   nombreUtilisateurs: number;
   createdAt: string;

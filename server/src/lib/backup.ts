@@ -7,7 +7,8 @@ export type TypeSauvegarde =
   | 'manuelle'
   | 'avant-import-evenements'
   | 'avant-import-utilisateurs'
-  | 'avant-restauration';
+  | 'avant-restauration'
+  | 'avant-fusion-doublons';
 
 /** Nombre de sauvegardes conservées : les plus anciennes au-delà sont purgées à chaque création. */
 const RETENTION = 30;

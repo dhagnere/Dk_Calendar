@@ -4,6 +4,7 @@ import { Button, Divider, Drawer, Grid, Image, Layout, Space, Tag, Typography } 
 import {
   CalendarOutlined,
   CloudUploadOutlined,
+  CopyOutlined,
   EnvironmentOutlined,
   MenuOutlined,
   TeamOutlined,
@@ -82,6 +83,7 @@ export function AppLayout() {
           { key: '/comptes', label: 'Comptes', icone: <TeamOutlined /> },
           { key: '/demandes', label: "Demandes d'accès", icone: <UserAddOutlined /> },
           { key: '/sauvegardes', label: 'Sauvegardes', icone: <CloudUploadOutlined /> },
+          { key: '/doublons', label: 'Doublons', icone: <CopyOutlined /> },
         ]
       : []),
   ];

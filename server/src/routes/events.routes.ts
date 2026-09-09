@@ -4,6 +4,8 @@ import { EventModel } from '../models/Event.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { LIMITES_CUD, geocoderPlusieursAdresses } from '../lib/geocodage.js';
 import { motifRechercheInsensibleAccents } from '../lib/rechercheAccents.js';
+import { cleIdentite } from '../lib/identiteEvenement.js';
+import { creerSauvegarde } from '../lib/backup.js';
 
 export const eventsRouter = Router();
 
@@ -102,6 +104,43 @@ eventsRouter.get('/options-filtres', async (_req, res) => {
     rows.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count }));
 
   res.json({ quartiers: format(quartiers), natures: format(natures), statuts: format(statuts), types: format(types) });
+});
+
+/**
+ * Détecte les doublons déjà présents en base (par ex. créés par des imports antérieurs à la
+ * normalisation du nom dans cleIdentite) : regroupe tous les événements par la même clé d'identité
+ * que l'import (eventId, sinon nom normalisé + jour), et ne renvoie que les groupes de 2 lignes ou
+ * plus. Réservé aux administrateurs, qui décident lesquelles conserver.
+ */
+eventsRouter.get('/doublons', requireAdmin, async (_req, res) => {
+  const evenements = await EventModel.find({}).sort({ nom: 1 }).lean();
+  const groupes = new Map<string, typeof evenements>();
+  for (const e of evenements) {
+    const cle = cleIdentite(e);
+    const liste = groupes.get(cle);
+    if (liste) liste.push(e);
+    else groupes.set(cle, [e]);
+  }
+  const doublons = [...groupes.values()].filter((liste) => liste.length > 1);
+  res.json({ doublons });
+});
+
+/**
+ * Fusionne un groupe de doublons : supprime les lignes indiquées (les autres membres du groupe sont
+ * conservés tels quels). Une sauvegarde de sécurité de l'état actuel est créée juste avant, pour
+ * pouvoir annuler la fusion si le mauvais exemplaire a été supprimé par erreur.
+ */
+eventsRouter.post('/doublons/fusionner', requireAdmin, async (req, res) => {
+  const schema = z.object({ idsASupprimer: z.array(z.string()).min(1) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, message: 'Données invalides' });
+    return;
+  }
+
+  await creerSauvegarde('avant-fusion-doublons');
+  await EventModel.deleteMany({ _id: { $in: parsed.data.idsASupprimer } });
+  res.json({ ok: true, supprimes: parsed.data.idsASupprimer.length });
 });
 
 /** Année à partir de laquelle porte le KPI "Total des manifestations" (voir GET /evenements/stats). */

@@ -11,52 +11,11 @@ import {
   stringifyUsersCsv,
 } from '../lib/csv.js';
 import { creerSauvegarde } from '../lib/backup.js';
+import { cleIdentite } from '../lib/identiteEvenement.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 export const importRouter = Router();
-
-/**
- * Normalise un nom d'événement pour la comparaison d'identité à l'import : majuscules, sans accents,
- * espaces superflus réduits. Insensible aux petites variations de saisie entre deux exports du même
- * événement (ex. « Marché de Noël », « MARCHE DE NOEL » ou « Marché de Noël  » avec un espace en
- * trop) : sans cette normalisation, une simple différence de casse ou d'accent fait passer la ligne
- * pour un événement distinct et la (re)crée en double, au lieu de la reconnaître comme déjà en base.
- */
-function normaliserNomPourIdentite(nom: string): string {
-  return nom
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toUpperCase()
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-/**
- * Clé d'identité d'un événement : eventId si présent, sinon le couple (nom normalisé, jour). La date
- * utilisée est dateClef si présente, sinon dateDeDebut en repli (un export brut sans notion de
- * « dateClef » n'a souvent qu'une date de début) : cela évite de fusionner deux événements distincts
- * qui partageraient le même nom à des dates différentes.
- *
- * Seul le JOUR calendaire compte (l'heure est ignorée) : un événement déjà en base avec une dateClef
- * à minuit et la même ligne réimportée depuis un export brut dont la « Date de début » porte une
- * heure précise (ex: 02/09/2026 14:00:00) doivent être reconnus comme le même événement, sans quoi
- * la ligne est (re)créée comme un doublon — c'est le bug rapporté (Ducasse de Rosendael en double,
- * une version validée et une non validée pour le même jour).
- */
-function cleIdentite(e: {
-  eventId?: string | null;
-  nom: string;
-  dateClef?: Date | null;
-  dateDeDebut?: Date | null;
-}): string {
-  if (e.eventId) return `id:${e.eventId}`;
-  const date = e.dateClef ?? e.dateDeDebut ?? null;
-  const jour = date
-    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    : '';
-  return `nom:${normaliserNomPourIdentite(e.nom)}|date:${jour}`;
-}
 
 /**
  * Importe des événements depuis un fichier CSV. Un événement de plusieurs jours a une ligne par
