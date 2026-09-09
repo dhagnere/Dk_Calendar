@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Card, Checkbox, DatePicker, Descriptions, Popconfirm, Typography } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
+import { ApiError } from '../api';
 import { estValide, type Evenement } from '../types';
 import { formatDate } from '../lib/formatDate';
 import { formatTitreEvenement } from '../lib/formatTitre';
@@ -15,8 +16,8 @@ interface Props {
   estAdministrateur: boolean;
   onToggleValidation: (id: string, champ: 'validationTechnique' | 'validationPolitique', valeur: boolean) => void;
   onValider: (id: string) => void;
-  onSupprimer?: (id: string) => void;
-  onChangerDates?: (id: string, dateDeDebut: string, dateDeFin: string | null) => void;
+  onSupprimer?: (id: string) => Promise<void> | void;
+  onChangerDates?: (id: string, dateDeDebut: string, dateDeFin: string | null) => Promise<void> | void;
 }
 
 /** Fiche détaillée d'un événement, utilisée dans la pop-up du jour sélectionné (vue Calendrier). */
@@ -32,6 +33,38 @@ export function FicheEvenement({
     evenement.dateDeDebut ? dayjs(evenement.dateDeDebut) : dayjs(),
     evenement.dateDeFin ? dayjs(evenement.dateDeFin) : evenement.dateDeDebut ? dayjs(evenement.dateDeDebut) : dayjs(),
   ]);
+  const [enCoursReport, setEnCoursReport] = useState(false);
+  const [enCoursSuppression, setEnCoursSuppression] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const reporter = async () => {
+    if (!plage || !onChangerDates) return;
+    setEnCoursReport(true);
+    setErreur(null);
+    try {
+      await onChangerDates(
+        evenement._id,
+        plage[0].format('YYYY-MM-DD'),
+        plage[1].isSame(plage[0], 'day') ? null : plage[1].format('YYYY-MM-DD')
+      );
+    } catch (err) {
+      setErreur(err instanceof ApiError ? err.message : "Échec du report : impossible de contacter le serveur.");
+    } finally {
+      setEnCoursReport(false);
+    }
+  };
+
+  const supprimer = async () => {
+    if (!onSupprimer) return;
+    setEnCoursSuppression(true);
+    setErreur(null);
+    try {
+      await onSupprimer(evenement._id);
+    } catch (err) {
+      setErreur(err instanceof ApiError ? err.message : "Échec de la suppression : impossible de contacter le serveur.");
+      setEnCoursSuppression(false);
+    }
+  };
   const items = [
     { key: 'lieu', label: 'Lieu', children: evenement.lieu || '—' },
     { key: 'pilote', label: 'Pilote', children: evenement.pilote || '—' },
@@ -93,44 +126,43 @@ export function FicheEvenement({
       )}
 
       {estAdministrateur && (onChangerDates || onSupprimer) && (
-        <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {onChangerDates && (
-            <>
-              <RangePicker
-                size="small"
-                format="DD/MM/YYYY"
-                value={plage}
-                onChange={(valeurs) => valeurs && setPlage(valeurs as [Dayjs, Dayjs])}
-                allowClear={false}
-              />
-              <Button
-                size="small"
-                onClick={() =>
-                  plage &&
-                  onChangerDates(
-                    evenement._id,
-                    plage[0].format('YYYY-MM-DD'),
-                    plage[1].isSame(plage[0], 'day') ? null : plage[1].format('YYYY-MM-DD')
-                  )
-                }
+        <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {onChangerDates && (
+              <>
+                <RangePicker
+                  size="small"
+                  format="DD/MM/YYYY"
+                  value={plage}
+                  onChange={(valeurs) => valeurs && setPlage(valeurs as [Dayjs, Dayjs])}
+                  allowClear={false}
+                />
+                <Button size="small" loading={enCoursReport} onClick={reporter}>
+                  Reporter
+                </Button>
+              </>
+            )}
+            {onSupprimer && (
+              <Popconfirm
+                title="Supprimer cet événement ?"
+                description="Cette action est définitive."
+                okText="Supprimer"
+                okButtonProps={{ danger: true }}
+                cancelText="Annuler"
+                onConfirm={supprimer}
               >
-                Reporter
-              </Button>
-            </>
-          )}
-          {onSupprimer && (
-            <Popconfirm
-              title="Supprimer cet événement ?"
-              description="Cette action est définitive."
-              okText="Supprimer"
-              okButtonProps={{ danger: true }}
-              cancelText="Annuler"
-              onConfirm={() => onSupprimer(evenement._id)}
+                <Button size="small" danger icon={<DeleteOutlined />} loading={enCoursSuppression} style={{ marginLeft: 'auto' }}>
+                  Supprimer
+                </Button>
+              </Popconfirm>
+            )}
+          </div>
+          {erreur && (
+            <Typography.Paragraph
+              style={{ marginTop: 8, marginBottom: 0, background: '#fff1f0', color: '#cf1322', padding: '6px 12px', borderRadius: 6, fontSize: 12 }}
             >
-              <Button size="small" danger icon={<DeleteOutlined />} style={{ marginLeft: 'auto' }}>
-                Supprimer
-              </Button>
-            </Popconfirm>
+              {erreur}
+            </Typography.Paragraph>
           )}
         </div>
       )}
