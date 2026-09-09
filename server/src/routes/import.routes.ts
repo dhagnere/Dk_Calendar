@@ -17,10 +17,26 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 export const importRouter = Router();
 
 /**
- * Clé d'identité d'un événement : eventId si présent, sinon le couple (nom, jour). La date utilisée
- * est dateClef si présente, sinon dateDeDebut en repli (un export brut sans notion de « dateClef »
- * n'a souvent qu'une date de début) : cela évite de fusionner deux événements distincts qui
- * partageraient le même nom à des dates différentes.
+ * Normalise un nom d'événement pour la comparaison d'identité à l'import : majuscules, sans accents,
+ * espaces superflus réduits. Insensible aux petites variations de saisie entre deux exports du même
+ * événement (ex. « Marché de Noël », « MARCHE DE NOEL » ou « Marché de Noël  » avec un espace en
+ * trop) : sans cette normalisation, une simple différence de casse ou d'accent fait passer la ligne
+ * pour un événement distinct et la (re)crée en double, au lieu de la reconnaître comme déjà en base.
+ */
+function normaliserNomPourIdentite(nom: string): string {
+  return nom
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Clé d'identité d'un événement : eventId si présent, sinon le couple (nom normalisé, jour). La date
+ * utilisée est dateClef si présente, sinon dateDeDebut en repli (un export brut sans notion de
+ * « dateClef » n'a souvent qu'une date de début) : cela évite de fusionner deux événements distincts
+ * qui partageraient le même nom à des dates différentes.
  *
  * Seul le JOUR calendaire compte (l'heure est ignorée) : un événement déjà en base avec une dateClef
  * à minuit et la même ligne réimportée depuis un export brut dont la « Date de début » porte une
@@ -39,7 +55,7 @@ function cleIdentite(e: {
   const jour = date
     ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     : '';
-  return `nom:${e.nom}|date:${jour}`;
+  return `nom:${normaliserNomPourIdentite(e.nom)}|date:${jour}`;
 }
 
 /**
