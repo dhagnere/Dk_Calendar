@@ -297,6 +297,22 @@ eventsRouter.post('/:id/validations', requireAdmin, async (req, res) => {
 const MAX_JOURS_REPORT = 366;
 
 /**
+ * Parse une date « civile » au format AAAA-MM-JJ (sans heure ni fuseau), telle qu'envoyée par le
+ * sélecteur de dates du client. Construite à partir des composants année/mois/jour directement (et
+ * non via `new Date(chaîneISO)`), pour ne dépendre d'aucune conversion de fuseau horaire : le jour
+ * choisi par l'utilisateur est toujours le jour stocké, quel que soit son fuseau horaire ou celui du
+ * serveur (contrairement à une date-heure complète, qui encoderait le fuseau du navigateur et serait
+ * mal réinterprétée par un serveur dans un fuseau différent).
+ */
+function parseJourCivil(value: string): Date | null {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const [, annee, mois, jour] = match;
+  const date = new Date(Number(annee), Number(mois) - 1, Number(jour));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
  * Change les dates d'un événement (report). Un événement sur plusieurs jours ayant une ligne par
  * jour (dateClef), reporter la date recrée l'intégralité de la série sur les nouveaux jours : toutes
  * les lignes de l'ancienne série (voir filtreSerie) sont supprimées puis remplacées par une ligne par
@@ -318,9 +334,9 @@ eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
     return;
   }
 
-  const nouveauDebut = new Date(parsed.data.dateDeDebut);
-  const nouveauFin = parsed.data.dateDeFin ? new Date(parsed.data.dateDeFin) : nouveauDebut;
-  if (Number.isNaN(nouveauDebut.getTime()) || Number.isNaN(nouveauFin.getTime()) || nouveauFin < nouveauDebut) {
+  const nouveauDebut = parseJourCivil(parsed.data.dateDeDebut);
+  const nouveauFin = parsed.data.dateDeFin ? parseJourCivil(parsed.data.dateDeFin) : nouveauDebut;
+  if (!nouveauDebut || !nouveauFin || nouveauFin < nouveauDebut) {
     res.status(400).json({ ok: false, message: 'Dates invalides' });
     return;
   }

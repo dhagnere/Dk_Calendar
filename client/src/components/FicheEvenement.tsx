@@ -105,7 +105,14 @@ export function FicheEvenement({
               />
               <Button
                 size="small"
-                onClick={() => plage && onChangerDates(evenement._id, plage[0].toISOString(), plage[1].isSame(plage[0], 'day') ? null : plage[1].toISOString())}
+                onClick={() =>
+                  plage &&
+                  onChangerDates(
+                    evenement._id,
+                    plage[0].format('YYYY-MM-DD'),
+                    plage[1].isSame(plage[0], 'day') ? null : plage[1].format('YYYY-MM-DD')
+                  )
+                }
               >
                 Reporter
               </Button>
