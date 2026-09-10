@@ -12,6 +12,7 @@ import {
 } from '../lib/csv.js';
 import { creerSauvegarde } from '../lib/backup.js';
 import { cleIdentite } from '../lib/identiteEvenement.js';
+import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -77,6 +78,11 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
     console.log(
       `[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${brouillonsIgnores} brouillons ignorés, ${errors.length} lignes ignorées`
     );
+    await consigner(identiteDeRequete(req), 'import_evenements', `${created} créé(s)`, {
+      created,
+      doublons,
+      brouillonsIgnores,
+    });
     res.json({ ok: true, created, doublons, brouillonsIgnores, errors, total: rows.length });
   } catch (err) {
     console.error("[import] Échec de l'import événements :", err);
@@ -147,6 +153,10 @@ importRouter.post('/utilisateurs', requireAdmin, upload.single('fichier'), async
       console.log('[import] Mots de passe temporaires générés :', motsDePasseGeneres);
     }
     console.log(`[import] Utilisateurs : ${created} créés, ${updated} mis à jour, ${errors.length} lignes ignorées`);
+    await consigner(identiteDeRequete(req), 'import_utilisateurs', `${created} créé(s), ${updated} mis à jour`, {
+      created,
+      updated,
+    });
     res.json({ ok: true, created, updated, errors, total: rows.length, motsDePasseGeneres });
   } catch (err) {
     console.error("[import] Échec de l'import utilisateurs :", err);

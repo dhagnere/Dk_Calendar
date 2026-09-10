@@ -13,6 +13,7 @@ import { accountsRouter } from './routes/accounts.routes.js';
 import { importRouter } from './routes/import.routes.js';
 import { accessRequestsRouter } from './routes/access-requests.routes.js';
 import { backupsRouter } from './routes/backups.routes.js';
+import { journalRouter } from './routes/journal.routes.js';
 import { demarrerSauvegardeQuotidienne } from './lib/backup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,7 @@ async function main() {
   app.use('/api/import', importRouter);
   app.use('/api/demandes-acces', accessRequestsRouter);
   app.use('/api/sauvegardes', backupsRouter);
+  app.use('/api/journal', journalRouter);
 
   demarrerSauvegardeQuotidienne();
 

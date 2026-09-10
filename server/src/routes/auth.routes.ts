@@ -4,6 +4,7 @@ import { UserModel } from '../models/User.js';
 import { genererHash, verifierMotDePasse } from '../lib/password.js';
 import { signSession, setSessionCookie, clearSessionCookie } from '../lib/session.js';
 import { requireAuth } from '../middleware/auth.js';
+import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 export const authRouter = Router();
 
@@ -37,8 +38,9 @@ authRouter.post('/initialiser-administrateur', async (req, res) => {
   const email = parsed.data.email.toLowerCase();
   const { hash, sel } = await genererHash(motDePasse);
 
-  await UserModel.create({ nom, email, role: 'Administrateur', statut: 'Actif', hash, sel });
+  const compte = await UserModel.create({ nom, email, role: 'Administrateur', statut: 'Actif', hash, sel });
   console.log(`[auth] Administrateur initial créé : ${email}`);
+  await consigner({ userId: compte.id, nom: compte.nom, email: compte.email }, 'creation_compte', email, { role: 'Administrateur', initial: true });
   res.json({ ok: true, message: 'Compte administrateur créé avec succès' });
 });
 
@@ -81,10 +83,12 @@ authRouter.post('/connexion', async (req, res) => {
   setSessionCookie(res, token);
 
   console.log(`[auth] Connexion réussie : ${email} (${role})`);
+  await consigner({ userId: compte.id, nom: compte.nom, email: compte.email }, 'connexion', email);
   res.json({ ok: true, message: 'Connexion réussie', session: { email: compte.email, nom: compte.nom, role } });
 });
 
-authRouter.post('/deconnexion', (_req, res) => {
+authRouter.post('/deconnexion', async (req, res) => {
+  if (req.session) await consigner(identiteDeRequete(req), 'deconnexion', req.session.email);
   clearSessionCookie(res);
   res.json({ ok: true });
 });
@@ -121,5 +125,6 @@ authRouter.post('/changer-mot-de-passe', requireAuth, async (req, res) => {
   compte.statut = 'Actif';
   await compte.save();
 
+  await consigner(identiteDeRequete(req), 'changement_mot_de_passe', compte.email);
   res.json({ ok: true, message: 'Mot de passe changé avec succès' });
 });

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { UserModel } from '../models/User.js';
 import { genererHash } from '../lib/password.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 export const accountsRouter = Router();
 
@@ -45,6 +46,7 @@ accountsRouter.post('/', async (req, res) => {
   });
 
   console.log(`[accounts] Compte créé pour ${email} (${parsed.data.role}) — mot de passe temporaire : ${parsed.data.motDePasseTemporaire}`);
+  await consigner(identiteDeRequete(req), 'creation_compte', email, { role: parsed.data.role });
   res.json({ ok: true, message: 'Compte créé avec succès', email });
 });
 
@@ -60,6 +62,11 @@ accountsRouter.post('/:id/statut', async (req, res) => {
     res.status(404).json({ ok: false, message: 'Compte introuvable' });
     return;
   }
+  await consigner(
+    identiteDeRequete(req),
+    parsed.data.statut === 'Suspendu' ? 'suspension_compte' : 'activation_compte',
+    updated.email
+  );
   res.json({ ok: true, message: `Compte ${parsed.data.statut === 'Suspendu' ? 'suspendu' : 'activé'}` });
 });
 
@@ -75,6 +82,7 @@ accountsRouter.delete('/:id', async (req, res) => {
     return;
   }
   console.log(`[accounts] Compte supprimé : ${supprime.email}`);
+  await consigner(identiteDeRequete(req), 'suppression_compte', supprime.email);
   res.json({ ok: true, message: 'Compte supprimé' });
 });
 
@@ -97,5 +105,6 @@ accountsRouter.post('/:id/reinitialiser-mot-de-passe', async (req, res) => {
   await compte.save();
 
   console.log(`[accounts] Mot de passe réinitialisé pour ${compte.email} — temporaire : ${parsed.data.nouveauMotDePasseTemporaire}`);
+  await consigner(identiteDeRequete(req), 'reinitialisation_mot_de_passe', compte.email);
   res.json({ ok: true, message: 'Mot de passe réinitialisé' });
 });

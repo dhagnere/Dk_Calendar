@@ -4,6 +4,7 @@ import { EventModel } from '../models/Event.js';
 import { UserModel } from '../models/User.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { creerSauvegarde } from '../lib/backup.js';
+import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 export const backupsRouter = Router();
 
@@ -18,8 +19,9 @@ backupsRouter.get('/', async (_req, res) => {
 });
 
 /** Déclenche une sauvegarde manuelle immédiate. */
-backupsRouter.post('/', async (_req, res) => {
+backupsRouter.post('/', async (req, res) => {
   await creerSauvegarde('manuelle');
+  await consigner(identiteDeRequete(req), 'creation_sauvegarde_manuelle', '');
   res.json({ ok: true, message: 'Sauvegarde créée' });
 });
 
@@ -57,6 +59,11 @@ backupsRouter.post('/:id/restaurer', async (req, res) => {
 
   console.log(
     `[backup] Restauration depuis la sauvegarde ${sauvegarde._id} (${sauvegarde.evenements.length} événements, ${sauvegarde.utilisateurs.length} utilisateurs)`
+  );
+  await consigner(
+    identiteDeRequete(req),
+    'restauration_sauvegarde',
+    `sauvegarde du ${new Date(sauvegarde.createdAt as unknown as string).toLocaleString('fr-FR')}`
   );
   res.json({ ok: true, message: 'Restauration effectuée' });
 });

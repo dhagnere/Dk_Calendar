@@ -10,6 +10,7 @@ import Comptes from './pages/Comptes';
 import Demandes from './pages/Demandes';
 import Sauvegardes from './pages/Sauvegardes';
 import Doublons from './pages/Doublons';
+import Journal from './pages/Journal';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/demandes" element={<Demandes />} />
           <Route path="/sauvegardes" element={<Sauvegardes />} />
           <Route path="/doublons" element={<Doublons />} />
+          <Route path="/journal" element={<Journal />} />
         </Route>
       </Route>
     </Routes>

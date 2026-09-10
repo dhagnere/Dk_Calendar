@@ -6,6 +6,7 @@ import {
   CloudUploadOutlined,
   CopyOutlined,
   EnvironmentOutlined,
+  FileTextOutlined,
   MenuOutlined,
   TeamOutlined,
   UnorderedListOutlined,
@@ -84,6 +85,7 @@ export function AppLayout() {
           { key: '/demandes', label: "Demandes d'accès", icone: <UserAddOutlined /> },
           { key: '/sauvegardes', label: 'Sauvegardes', icone: <CloudUploadOutlined /> },
           { key: '/doublons', label: 'Doublons', icone: <CopyOutlined /> },
+          { key: '/journal', label: 'Journal', icone: <FileTextOutlined /> },
         ]
       : []),
   ];

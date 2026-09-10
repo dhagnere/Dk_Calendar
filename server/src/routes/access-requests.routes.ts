@@ -5,6 +5,7 @@ import { UserModel } from '../models/User.js';
 import { genererHash } from '../lib/password.js';
 import { notifierNouvelleDemandeAcces } from '../lib/email.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 export const accessRequestsRouter = Router();
 
@@ -103,6 +104,7 @@ accessRequestsRouter.post('/:id/approuver', async (req, res) => {
   await demande.save();
 
   console.log(`[demandes-acces] Demande approuvée pour ${demande.email} (${parsed.data.role}) — mot de passe temporaire : ${parsed.data.motDePasseTemporaire}`);
+  await consigner(identiteDeRequete(req), 'approbation_demande_acces', demande.email, { role: parsed.data.role });
   res.json({ ok: true, message: 'Compte créé avec succès', email: demande.email });
 });
 
@@ -125,5 +127,6 @@ accessRequestsRouter.post('/:id/rejeter', async (req, res) => {
     return;
   }
 
+  await consigner(identiteDeRequete(req), 'rejet_demande_acces', demande.email);
   res.json({ ok: true, message: 'Demande rejetée' });
 });

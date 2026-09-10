@@ -6,6 +6,7 @@ import { LIMITES_CUD, geocoderPlusieursAdresses } from '../lib/geocodage.js';
 import { motifRechercheInsensibleAccents } from '../lib/rechercheAccents.js';
 import { cleIdentite } from '../lib/identiteEvenement.js';
 import { creerSauvegarde } from '../lib/backup.js';
+import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 export const eventsRouter = Router();
 
@@ -140,6 +141,9 @@ eventsRouter.post('/doublons/fusionner', requireAdmin, async (req, res) => {
 
   await creerSauvegarde('avant-fusion-doublons');
   await EventModel.deleteMany({ _id: { $in: parsed.data.idsASupprimer } });
+  await consigner(identiteDeRequete(req), 'fusion_doublons', `${parsed.data.idsASupprimer.length} exemplaire(s) supprimé(s)`, {
+    idsASupprimer: parsed.data.idsASupprimer,
+  });
   res.json({ ok: true, supprimes: parsed.data.idsASupprimer.length });
 });
 
@@ -274,6 +278,7 @@ eventsRouter.delete('/:id', requireAdmin, async (req, res) => {
   }
   await EventModel.deleteMany({ ...filtreSerie(cible), dateClef: { $ne: cible.dateClef } });
   await EventModel.findByIdAndDelete(cible._id);
+  await consigner(identiteDeRequete(req), 'suppression_evenement', cible.nom);
   res.json({ ok: true });
 });
 
@@ -299,6 +304,7 @@ eventsRouter.post('/:id/statut', requireAdmin, async (req, res) => {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
+  await consigner(identiteDeRequete(req), 'changement_statut_evenement', updated.nom, { statut: parsed.data.statut });
   res.json({ ok: true, item: updated });
 });
 
@@ -329,6 +335,7 @@ eventsRouter.post('/:id/validations', requireAdmin, async (req, res) => {
   }
   await EventModel.updateMany(filtreSerie(cible), parsed.data);
   const updated = await EventModel.findById(req.params.id);
+  await consigner(identiteDeRequete(req), 'changement_validation', cible.nom, parsed.data);
   res.json({ ok: true, item: updated });
 });
 
@@ -403,6 +410,10 @@ eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
 
   await EventModel.deleteMany(filtreSerie(cible));
   const crees = await EventModel.insertMany(nouvellesLignes);
+  await consigner(identiteDeRequete(req), 'report_date_evenement', cible.nom, {
+    ancien: { dateDeDebut: cible.dateDeDebut, dateDeFin: cible.dateDeFin },
+    nouveau: { dateDeDebut: nouveauDebut, dateDeFin: memeJour ? null : nouveauFin },
+  });
   res.json({ ok: true, items: crees });
 });
 
@@ -424,5 +435,10 @@ eventsRouter.post('/:id/valider', requireAdmin, async (req, res) => {
     validParDateClef: viaPastilleDateClef ?? false,
   });
   const updated = await EventModel.findById(req.params.id);
+  await consigner(
+    identiteDeRequete(req),
+    viaPastilleDateClef ? 'marquage_date_clef' : 'validation_evenement',
+    cible.nom
+  );
   res.json({ ok: true, item: updated });
 });
