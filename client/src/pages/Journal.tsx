@@ -36,6 +36,7 @@ const LIBELLES_ACTION: Record<string, { libelle: string; couleur?: string }> = {
   approbation_demande_acces: { libelle: "Approbation de demande d'accès", couleur: 'green' },
   rejet_demande_acces: { libelle: "Rejet de demande d'accès", couleur: 'red' },
   creation_sauvegarde_manuelle: { libelle: 'Sauvegarde manuelle' },
+  synchronisation_github: { libelle: 'Synchronisation GitHub', couleur: 'cyan' },
   restauration_sauvegarde: { libelle: 'Restauration de sauvegarde', couleur: 'red' },
 };
 

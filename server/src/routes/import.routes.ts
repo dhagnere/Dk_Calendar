@@ -13,6 +13,7 @@ import {
 import { creerSauvegarde } from '../lib/backup.js';
 import { cleIdentite } from '../lib/identiteEvenement.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
+import { synchroniserEvenementsVersGithub } from '../lib/github.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -84,6 +85,15 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
       brouillonsIgnores,
     });
     res.json({ ok: true, created, doublons, brouillonsIgnores, errors, total: rows.length });
+
+    // Après avoir répondu au client : pousse l'état complet et à jour des événements (avec leurs
+    // attributs actuels — validations, statut…) vers data/evenements.csv sur GitHub, pour que ce
+    // fichier serve de seed à jour en cas de futur déploiement. Best-effort, ne bloque jamais
+    // l'import lui-même (déjà répondu ci-dessus) ni ne le fait échouer en cas de panne GitHub.
+    const resultatSync = await synchroniserEvenementsVersGithub();
+    await consigner(identiteDeRequete(req), 'synchronisation_github', resultatSync.message, {
+      ok: resultatSync.ok,
+    });
   } catch (err) {
     console.error("[import] Échec de l'import événements :", err);
     res.status(500).json({

@@ -37,4 +37,12 @@ export const config = {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  // Synchronisation de data/evenements.csv vers GitHub après chaque import (voir lib/github.ts).
+  // Fonctionnalité désactivée (silencieusement) tant que GITHUB_TOKEN n'est pas renseigné.
+  github: {
+    token: process.env.GITHUB_TOKEN,
+    repo: process.env.GITHUB_REPO ?? 'dhagnere/Dk_Calendar',
+    branch: process.env.GITHUB_BRANCH ?? 'claude/git-setup-xr34b7',
+    cheminEvenements: process.env.GITHUB_CHEMIN_EVENEMENTS ?? 'data/evenements.csv',
+  },
 };
