@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { AccessRequestModel } from '../models/AccessRequest.js';
 import { UserModel } from '../models/User.js';
 import { genererHash } from '../lib/password.js';
@@ -9,8 +10,17 @@ import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 export const accessRequestsRouter = Router();
 
+/** Limite les dépôts de demandes : 5 par IP et par heure (formulaire public, sans authentification). */
+const limiteurDemandeAcces = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, message: 'Trop de demandes envoyées, réessayez plus tard' },
+});
+
 /** Dépose une demande d'accès. Public : aucune authentification requise. */
-accessRequestsRouter.post('/', async (req, res) => {
+accessRequestsRouter.post('/', limiteurDemandeAcces, async (req, res) => {
   const schema = z.object({
     nom: z.string().min(1),
     email: z.string().email(),

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +23,11 @@ async function main() {
   await connectDb();
 
   const app = express();
+  // La politique de sécurité de contenu (CSP) n'est pas activée ici : la mettre en place correctement
+  // pour une appli servie en statique (scripts/styles Vite avec hash) demande un réglage dédié, hors
+  // périmètre de ce durcissement. Les autres en-têtes de helmet (X-Content-Type-Options,
+  // X-Frame-Options, HSTS, retrait de X-Powered-By…) sont sans risque de régression et actifs.
+  app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: config.clientOrigin, credentials: true }));
   app.use(express.json());
   app.use(cookieParser());

@@ -8,12 +8,22 @@ function required(name: string, fallback?: string): string {
   return value;
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// En production, JWT_SECRET n'a AUCUNE valeur de repli : un secret par défaut visible dans ce dépôt
+// permettrait à quiconque le connaît de forger de fausses sessions (y compris administrateur) si la
+// variable d'environnement n'était pas positionnée sur le déploiement. Le repli n'existe que pour le
+// confort du développement local.
+const jwtSecret = isProduction
+  ? required('JWT_SECRET')
+  : required('JWT_SECRET', 'changez-moi-en-production-secret-dev-uniquement');
+
 export const config = {
   port: parseInt(process.env.PORT ?? '4000', 10),
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/dk_calendar'),
-  jwtSecret: required('JWT_SECRET', 'changez-moi-en-production-secret-dev-uniquement'),
+  jwtSecret,
   cookieName: 'dk_session',
-  isProduction: process.env.NODE_ENV === 'production',
+  isProduction,
   clientOrigin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
   // URL publique de l'application, utilisée pour construire les liens dans les emails.
   appUrl: process.env.APP_URL ?? process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { UserModel } from '../models/User.js';
 import { genererHash, verifierMotDePasse } from '../lib/password.js';
 import { signSession, setSessionCookie, clearSessionCookie } from '../lib/session.js';
@@ -7,6 +8,15 @@ import { requireAuth } from '../middleware/auth.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
 
 export const authRouter = Router();
+
+/** Freine les tentatives de mot de passe par force brute : 10 essais par IP toutes les 15 minutes. */
+const limiteurConnexion = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, message: 'Trop de tentatives de connexion, réessayez dans quelques minutes' },
+});
 
 /** Existe-t-il déjà un administrateur actif ? (contrôle affiché à l'écran de connexion) */
 authRouter.get('/existe-administrateur', async (_req, res) => {
@@ -45,7 +55,7 @@ authRouter.post('/initialiser-administrateur', async (req, res) => {
 });
 
 /** Authentifie un utilisateur et pose le cookie de session. */
-authRouter.post('/connexion', async (req, res) => {
+authRouter.post('/connexion', limiteurConnexion, async (req, res) => {
   const schema = z.object({ email: z.string().email(), motDePasse: z.string().min(1) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {

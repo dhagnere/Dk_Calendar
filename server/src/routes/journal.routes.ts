@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { JournalActionModel } from '../models/JournalAction.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { queryString } from '../lib/queryString.js';
 
 export const journalRouter = Router();
 
@@ -9,7 +10,12 @@ journalRouter.use(requireAdmin);
 
 /** Liste paginée du journal d'audit, filtrable par utilisateur et par type d'action. */
 journalRouter.get('/', async (req, res) => {
-  const { utilisateur, action, page, limit } = req.query as Record<string, string | undefined>;
+  // queryString() écarte toute valeur qui ne serait pas une chaîne simple (ex. ?utilisateur[$ne]=,
+  // transformé en objet par le parseur de requête) avant de l'utiliser dans un filtre MongoDB.
+  const utilisateur = queryString(req.query.utilisateur);
+  const action = queryString(req.query.action);
+  const page = queryString(req.query.page);
+  const limit = queryString(req.query.limit);
 
   const filter: Record<string, unknown> = {};
   if (utilisateur) filter.utilisateurEmail = utilisateur;

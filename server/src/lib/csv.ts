@@ -169,7 +169,7 @@ export interface EventCsvRow {
  * exemple une colonne « Évaluée » propre au logiciel source) sont simplement ignorées.
  */
 export function parseEventsCsv(content: string): { rows: EventCsvRow[]; errors: string[] } {
-  const records: Record<string, string>[] = parse(content, {
+  const records: Record<string, string>[] = parse<Record<string, string>>(content, {
     columns: true,
     delimiter: detecterDelimiteur(content),
     skip_empty_lines: true,
@@ -275,7 +275,7 @@ export interface UserCsvRow {
 }
 
 export function parseUsersCsv(content: string): { rows: UserCsvRow[]; errors: string[] } {
-  const records: Record<string, string>[] = parse(content, {
+  const records: Record<string, string>[] = parse<Record<string, string>>(content, {
     columns: true,
     skip_empty_lines: true,
     trim: true,

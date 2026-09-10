@@ -7,6 +7,7 @@ import { motifRechercheInsensibleAccents } from '../lib/rechercheAccents.js';
 import { cleIdentite } from '../lib/identiteEvenement.js';
 import { creerSauvegarde } from '../lib/backup.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
+import { queryString } from '../lib/queryString.js';
 
 export const eventsRouter = Router();
 
@@ -33,8 +34,17 @@ const DATE_FIN_EFFECTIVE = { $ifNull: ['$dateDeFin', { $ifNull: ['$dateDeDebut',
  * masqués ; passer `avecEvenementsArchives=true` les inclut à nouveau (déclencheur côté client).
  */
 eventsRouter.get('/', async (req, res) => {
-  const { quartier, statut, nature, type, searchTerm, avecEvenementsPasses, avecEvenementsArchives } =
-    req.query as Record<string, string | undefined>;
+  // Chaque valeur passe par queryString() : sans ça, une requête façonnée comme
+  // ?quartier[$ne]= (que le parseur de requête d'Express transforme en objet) pourrait être
+  // affectée telle quelle à un filtre MongoDB et injecter un opérateur ($ne, $regex…) au lieu
+  // d'une simple comparaison d'égalité — cette route est publique, sans authentification.
+  const quartier = queryString(req.query.quartier);
+  const statut = queryString(req.query.statut);
+  const nature = queryString(req.query.nature);
+  const type = queryString(req.query.type);
+  const searchTerm = queryString(req.query.searchTerm);
+  const avecEvenementsPasses = queryString(req.query.avecEvenementsPasses);
+  const avecEvenementsArchives = queryString(req.query.avecEvenementsArchives);
 
   const maintenant = new Date();
 
