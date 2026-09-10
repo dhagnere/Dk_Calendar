@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Grid, Input, Select, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Button, Card, Grid, Input, Popconfirm, Select, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
 import type { Compte } from '../types';
 import { genererMotDePasse } from '../lib/generatePassword';
 import { formatDate } from '../lib/formatDate';
@@ -9,6 +11,7 @@ const { Text } = Typography;
 const { useBreakpoint } = Grid;
 
 export default function Comptes() {
+  const { session } = useAuth();
   const breakpoint = useBreakpoint();
   const mobile = !breakpoint.sm;
   const [comptes, setComptes] = useState<Compte[]>([]);
@@ -69,6 +72,12 @@ export default function Comptes() {
     charger();
   };
 
+  const supprimer = async (compte: Compte) => {
+    await api.delete(`/comptes/${compte._id}`);
+    setMessage(`Compte supprimé : ${compte.email}`);
+    charger();
+  };
+
   const badgeColor = (statut: string) => (statut === 'Suspendu' ? 'red' : statut === 'Actif' ? 'green' : 'orange');
 
   const columns: TableColumnsType<Compte> = [
@@ -80,7 +89,7 @@ export default function Comptes() {
     {
       title: 'Actions',
       key: 'actions',
-      width: 260,
+      width: 300,
       render: (_, c) => (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button size="small" onClick={() => toggleStatut(c)}>
@@ -89,6 +98,18 @@ export default function Comptes() {
           <Button size="small" onClick={() => reinitialiser(c)}>
             Réinitialiser mot de passe
           </Button>
+          {c._id !== session?.userId && (
+            <Popconfirm
+              title="Supprimer ce compte ?"
+              description="Cette action est définitive."
+              okText="Supprimer"
+              okButtonProps={{ danger: true }}
+              cancelText="Annuler"
+              onConfirm={() => supprimer(c)}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </div>
       ),
     },

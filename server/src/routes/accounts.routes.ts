@@ -63,6 +63,21 @@ accountsRouter.post('/:id/statut', async (req, res) => {
   res.json({ ok: true, message: `Compte ${parsed.data.statut === 'Suspendu' ? 'suspendu' : 'activé'}` });
 });
 
+/** Supprime un compte. Un administrateur ne peut pas se supprimer lui-même. */
+accountsRouter.delete('/:id', async (req, res) => {
+  if (req.session?.userId === req.params.id) {
+    res.status(400).json({ ok: false, message: 'Vous ne pouvez pas supprimer votre propre compte' });
+    return;
+  }
+  const supprime = await UserModel.findByIdAndDelete(req.params.id);
+  if (!supprime) {
+    res.status(404).json({ ok: false, message: 'Compte introuvable' });
+    return;
+  }
+  console.log(`[accounts] Compte supprimé : ${supprime.email}`);
+  res.json({ ok: true, message: 'Compte supprimé' });
+});
+
 accountsRouter.post('/:id/reinitialiser-mot-de-passe', async (req, res) => {
   const schema = z.object({ nouveauMotDePasseTemporaire: z.string().min(10) });
   const parsed = schema.safeParse(req.body);
