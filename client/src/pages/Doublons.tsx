@@ -53,7 +53,7 @@ export default function Doublons() {
     try {
       await api.post('/evenements/doublons/fusionner', { idsASupprimer });
       setMessage(`Doublon fusionné : ${idsASupprimer.length} exemplaire(s) supprimé(s).`);
-      charger();
+      await charger();
     } finally {
       setFusionEnCours(null);
     }
