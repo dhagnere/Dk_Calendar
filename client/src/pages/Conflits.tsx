@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Collapse, Grid, Modal, Typography } from 'antd';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { estValide, type Evenement } from '../types';
-import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
+import { estBrouillon, estValide, type Evenement } from '../types';
+import { COULEUR_BROUILLON, COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { formatTitreEvenement } from '../lib/formatTitre';
 import { majusculeInitiale } from '../lib/formatDate';
 import { FicheEvenement } from '../components/FicheEvenement';
@@ -124,7 +124,6 @@ export default function Conflits() {
 
     const parJour = new Map<string, Evenement[]>();
     for (const e of evenements) {
-      if (e.statut === 'Brouillon') continue;
       for (const cle of joursDe(e)) {
         if (cle < cleAujourdhui) continue;
         const liste = parJour.get(cle);
@@ -237,7 +236,7 @@ export default function Conflits() {
                         width: 8,
                         height: 8,
                         borderRadius: '50%',
-                        background: estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE,
+                        background: estBrouillon(e) ? COULEUR_BROUILLON : estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE,
                       }}
                     />
                     <Text strong style={{ flex: mobile ? '1 0 100%' : 1, minWidth: 0, marginLeft: mobile ? 12 : 0 }}>

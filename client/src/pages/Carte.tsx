@@ -11,8 +11,8 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useGeocodage } from '../context/GeocodageContext';
 import type { Evenement } from '../types';
-import { estValide } from '../types';
-import { COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
+import { estBrouillon, estValide } from '../types';
+import { COULEUR_BROUILLON, COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { formatDuree } from '../lib/formatDuree';
 import { formatTitreEvenement } from '../lib/formatTitre';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
@@ -168,12 +168,9 @@ export default function Carte() {
 
   const pasSlider = ETAPES_SLIDER[pasIndex].valeur;
 
-  // Les brouillons ne doivent jamais apparaître sur la carte, et un événement sur plusieurs jours ne
-  // doit produire qu'une seule fiche (pas une par jour occupé).
-  const evenementsUtiles = useMemo(
-    () => regrouperParEvenement(evenements.filter((e) => e.statut !== 'Brouillon')),
-    [evenements]
-  );
+  // Un événement sur plusieurs jours ne doit produire qu'une seule fiche (pas une par jour occupé) ;
+  // les brouillons apparaissent comme les autres, signalés par la même pastille grise qu'ailleurs.
+  const evenementsUtiles = useMemo(() => regrouperParEvenement(evenements), [evenements]);
 
   const evenementsFiltres = useMemo(() => {
     let liste = evenementsUtiles;
@@ -274,7 +271,7 @@ export default function Carte() {
                             height: 8,
                             borderRadius: '50%',
                             marginRight: 6,
-                            background: estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE,
+                            background: estBrouillon(e) ? COULEUR_BROUILLON : estValide(e) ? COULEUR_VALIDE : COULEUR_NON_VALIDE,
                           }}
                         />
                         <strong>{formatTitreEvenement(e.nom)}</strong>
