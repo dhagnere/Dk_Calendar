@@ -41,6 +41,10 @@ export function estValide(e: Pick<Evenement, 'validationTechnique' | 'validation
   return e.validationTechnique && e.validationPolitique;
 }
 
+export function estBrouillon(e: Pick<Evenement, 'statut'>): boolean {
+  return e.statut === 'Brouillon';
+}
+
 export interface Sauvegarde {
   _id: string;
   type:

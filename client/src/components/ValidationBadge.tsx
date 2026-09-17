@@ -1,7 +1,20 @@
 import { Tag } from 'antd';
-import { estValide, type Evenement } from '../types';
+import { estBrouillon, estValide, type Evenement } from '../types';
+
+/** Pastille « Brouillon », affichée en plus du statut de validation dans toutes les vues de l'application. */
+export function BrouillonBadge({ evenement }: { evenement: Evenement }) {
+  return estBrouillon(evenement) ? <Tag color="default">Brouillon</Tag> : null;
+}
 
 export function ValidationBadge({ evenement }: { evenement: Evenement }) {
-  if (evenement.validParDateClef) return <Tag color="blue">Date Clef</Tag>;
-  return estValide(evenement) ? <Tag color="green">Validée</Tag> : <Tag color="red">Non validée</Tag>;
+  return (
+    <>
+      <BrouillonBadge evenement={evenement} />
+      {evenement.validParDateClef ? (
+        <Tag color="blue">Date Clef</Tag>
+      ) : (
+        <Tag color={estValide(evenement) ? 'green' : 'red'}>{estValide(evenement) ? 'Validée' : 'Non validée'}</Tag>
+      )}
+    </>
+  );
 }

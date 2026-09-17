@@ -24,14 +24,13 @@ export const importRouter = Router();
  * jour occupé (même nom, même dateDeDebut/dateDeFin, mais dateClef différente) : l'identité d'une
  * ligne se détermine donc par eventId si présent, sinon par (nom, dateClef).
  *
- * Trois filtres s'appliquent avant toute écriture en base :
- * - une ligne au statut « Brouillon » n'est jamais importée (ni créée, ni utilisée pour mettre à
- *   jour quoi que ce soit) ;
- * - une ligne dont l'identité correspond à un événement déjà présent (en base, ou déjà rencontrée
- *   plus tôt dans le même fichier) est un doublon : elle est ignorée sans rien modifier, pour ne
- *   jamais écraser le statut, les validations ou toute autre donnée déjà saisie dans l'application ;
- * - seules les lignes qui passent ces deux filtres, c'est-à-dire les véritables nouvelles
- *   manifestations, sont créées — elles deviennent alors visibles dans le Calendrier et la Liste.
+ * Une ligne au statut « Brouillon » est désormais importée comme n'importe quelle autre : elle
+ * devient visible dans le Calendrier et la Liste, avec une pastille « Brouillon » pour la
+ * distinguer partout dans l'application. Seul un filtre s'applique donc avant toute écriture en
+ * base : une ligne dont l'identité correspond à un événement déjà présent (en base, ou déjà
+ * rencontrée plus tôt dans le même fichier) est un doublon — elle est ignorée sans rien modifier,
+ * pour ne jamais écraser le statut, les validations ou toute autre donnée déjà saisie dans
+ * l'application.
  *
  * Les identités déjà en base sont chargées en une seule requête et les nouveaux événements insérés
  * en un seul lot (au lieu de deux allers-retours base par ligne) : avec un gros fichier, la version
@@ -54,14 +53,8 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
     const clesVues = new Set<string>();
     const aCreer: typeof rows = [];
     let doublons = 0;
-    let brouillonsIgnores = 0;
 
     for (const row of rows) {
-      if (row.statut === 'Brouillon') {
-        brouillonsIgnores++;
-        continue;
-      }
-
       const cle = cleIdentite(row);
       if (clesVues.has(cle) || clesExistantes.has(cle)) {
         doublons++;
@@ -77,14 +70,13 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
 
     const created = aCreer.length;
     console.log(
-      `[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${brouillonsIgnores} brouillons ignorés, ${errors.length} lignes ignorées`
+      `[import] Événements : ${created} créés, ${doublons} doublons ignorés, ${errors.length} lignes ignorées`
     );
     await consigner(identiteDeRequete(req), 'import_evenements', `${created} créé(s)`, {
       created,
       doublons,
-      brouillonsIgnores,
     });
-    res.json({ ok: true, created, doublons, brouillonsIgnores, errors, total: rows.length });
+    res.json({ ok: true, created, doublons, errors, total: rows.length });
 
     // Après avoir répondu au client : pousse l'état complet et à jour des événements (avec leurs
     // attributs actuels — validations, statut…) vers data/evenements.csv sur GitHub, pour que ce

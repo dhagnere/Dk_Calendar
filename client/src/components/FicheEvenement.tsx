@@ -3,10 +3,10 @@ import { Button, Card, Checkbox, DatePicker, Descriptions, Popconfirm, Typograph
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { ApiError } from '../api';
-import { estValide, type Evenement } from '../types';
+import { estBrouillon, estValide, type Evenement } from '../types';
 import { formatDate } from '../lib/formatDate';
 import { formatTitreEvenement } from '../lib/formatTitre';
-import { COULEUR_DATE_CLEF, COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
+import { COULEUR_BROUILLON, COULEUR_DATE_CLEF, COULEUR_NON_VALIDE, COULEUR_VALIDE } from '../lib/validationColors';
 import { ValidationBadge } from './ValidationBadge';
 
 const { RangePicker } = DatePicker;
@@ -83,11 +83,13 @@ export function FicheEvenement({
     },
   ];
 
-  const couleurBordure = evenement.validParDateClef
-    ? COULEUR_DATE_CLEF
-    : estValide(evenement)
-      ? COULEUR_VALIDE
-      : COULEUR_NON_VALIDE;
+  const couleurBordure = estBrouillon(evenement)
+    ? COULEUR_BROUILLON
+    : evenement.validParDateClef
+      ? COULEUR_DATE_CLEF
+      : estValide(evenement)
+        ? COULEUR_VALIDE
+        : COULEUR_NON_VALIDE;
 
   return (
     <Card
