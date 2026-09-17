@@ -250,19 +250,19 @@ export default function Carte() {
         )}
         <MapContainer center={CENTRE_DUNKERQUE} zoom={12} style={{ height: mobile ? 420 : 600, width: '100%' }}>
           {/*
-            Le serveur de tuiles "de démo" tile.openstreetmap.org est réservé à un usage ponctuel et
-            léger : sa politique d'utilisation (https://operations.osmfoundation.org/policies/tiles/)
-            bloque (403 "App is not following the tile usage policy") tout usage d'application
-            régulier, ce qui se manifestait notamment en mode application installée. On utilise donc à
-            la place les tuiles CARTO (gratuites, sans clé, prévues pour ce type d'intégration), qui
-            réutilisent les mêmes données OpenStreetMap — d'où la double attribution ci-dessous.
+            Deux fournisseurs de tuiles gratuits déjà essayés et écartés ici :
+            - tile.openstreetmap.org (serveur "de démo" d'OSM) : bloque (403 "App is not following
+              the tile usage policy") tout usage d'application régulier, cf.
+              https://operations.osmfoundation.org/policies/tiles/ ;
+            - basemaps.cartocdn.com (CARTO) : n'accepte plus de requêtes anonymes, affiche désormais
+              un tuile "API key required" sans compte/clé CARTO.
+            Esri World Street Map ne demande ni compte ni clé et reste stable sur ce point depuis des
+            années ; ses données ne viennent pas d'OpenStreetMap, d'où l'attribution différente.
           */}
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-            subdomains="abcd"
-            maxZoom={20}
-            detectRetina
+            attribution='Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
           />
           <RecentrageCarte lieux={lieux} />
           {lieux.map((l) => (
