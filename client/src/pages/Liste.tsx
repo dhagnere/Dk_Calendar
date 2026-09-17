@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Button, Checkbox, Grid, Input, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
+import { Button, Checkbox, Grid, Input, Modal, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import type { Evenement } from '../types';
 import { ValidationBadge } from '../components/ValidationBadge';
 import { COULEUR_DATE_CLEF } from '../lib/validationColors';
 import { ImportExportEvenements } from '../components/ImportExportEvenements';
+import { FicheEvenement } from '../components/FicheEvenement';
 import { regrouperParEvenement } from '../lib/regrouperEvenements';
 import { formatDuree } from '../lib/formatDuree';
 import { formatTitreEvenement } from '../lib/formatTitre';
@@ -93,6 +94,7 @@ export default function Liste() {
   const [statut, setStatut] = useState('ALL');
   const [nature, setNature] = useState('ALL');
   const [avecEvenementsArchives, setAvecEvenementsArchives] = useState(false);
+  const [evenementOuvertId, setEvenementOuvertId] = useState<string | null>(null);
   const [options, setOptions] = useState<{
     quartiers: { label: string }[];
     natures: { label: string }[];
@@ -143,8 +145,20 @@ export default function Liste() {
     charger();
   };
 
+  const validerUnClic = async (id: string) => {
+    await api.post(`/evenements/${id}/valider`, {});
+    charger();
+  };
+
   const supprimer = async (id: string) => {
     await api.delete(`/evenements/${id}`);
+    setEvenementOuvertId(null);
+    charger();
+  };
+
+  const changerDates = async (id: string, dateDeDebut: string, dateDeFin: string | null) => {
+    await api.post(`/evenements/${id}/dates`, { dateDeDebut, dateDeFin });
+    setEvenementOuvertId(null);
     charger();
   };
 
@@ -175,7 +189,12 @@ export default function Liste() {
             key: 'actions',
             width: 260,
             render: (e: Evenement) => (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
+              // stopPropagation : ces contrôles ne doivent pas aussi déclencher l'ouverture de la
+              // fiche détaillée au clic sur la ligne (voir onRow du Table plus bas).
+              <div
+                onClick={(ev) => ev.stopPropagation()}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}
+              >
                 <Checkbox
                   checked={e.validationTechnique}
                   onChange={(ev) => toggleValidation(e._id, 'validationTechnique', ev.target.checked)}
@@ -242,6 +261,10 @@ export default function Liste() {
     },
   }));
 
+  const evenementOuvert = evenementOuvertId
+    ? (evenementsGroupes.find((e) => e._id === evenementOuvertId) ?? null)
+    : null;
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -305,7 +328,31 @@ export default function Liste() {
         bordered
         scroll={{ x: mobile ? 'max-content' : undefined }}
         locale={{ emptyText: 'Aucun événement' }}
+        onRow={(ligne) =>
+          ligne.type === 'evenement'
+            ? { onClick: () => setEvenementOuvertId(ligne.evenement._id), style: { cursor: 'pointer' } }
+            : {}
+        }
       />
+
+      <Modal
+        open={!!evenementOuvert}
+        onCancel={() => setEvenementOuvertId(null)}
+        footer={null}
+        width={mobile ? '94%' : 720}
+        title={null}
+      >
+        {evenementOuvert && (
+          <FicheEvenement
+            evenement={evenementOuvert}
+            estAdministrateur={estAdministrateur}
+            onToggleValidation={toggleValidation}
+            onValider={validerUnClic}
+            onSupprimer={supprimer}
+            onChangerDates={changerDates}
+          />
+        )}
+      </Modal>
     </div>
   );
 }
