@@ -1,16 +1,20 @@
 # 📅 Calendrier Événements Dunkerque
 
 Reconstruction en application web **autonome** (indépendante de monday.com) de l'app d'origine, à partir de l'export
-`reference-vibe-export/` (qui reste dans le dépôt comme référence pour les fonctionnalités non encore reconstruites).
+`reference-vibe-export/` (qui reste dans le dépôt comme référence historique).
 
 - **Backend** : Node.js + Express + TypeScript, base de données **MongoDB** (Mongoose)
-- **Frontend** : React + Vite + TypeScript + Chakra UI
+- **Frontend** : React + Vite + TypeScript + Ant Design
 - **Auth** : comptes Administrateur / Consultant, mot de passe haché (PBKDF2 + sel), session via cookie JWT
-- **Données** : deux fichiers CSV (`data/evenements.csv`, `data/utilisateurs.csv`) servent de **base d'import/seed**
+- **Données** : deux fichiers CSV (`data/evenements.csv`, `data/utilisateurs.csv`) servent de **base d'import/seed** —
+  `evenements.csv` est tenu à jour automatiquement (voir section Synchronisation GitHub ci-dessous)
 
-## Périmètre actuel (MVP)
+> **Déployer sur les serveurs de la CUD ?** Voir [`docs/DEPLOIEMENT-CUD.md`](docs/DEPLOIEMENT-CUD.md) : procédure
+> complète pas à pas (reprise des données réelles actuelles, HTTPS, sauvegardes, sécurité, et comment continuer à
+> développer de nouvelles fonctionnalités sans jamais toucher directement au serveur de production).
 
-Implémenté :
+## Fonctionnalités
+
 - Connexion / création du premier compte administrateur
 - Gestion des comptes (créer, suspendre/activer, réinitialiser le mot de passe) — administrateurs uniquement
 - **Demande d'accès en libre-service** : un utilisateur sans compte peut en demander un depuis l'écran de connexion ;
@@ -18,24 +22,34 @@ Implémenté :
   l'admin approuve (en choisissant le rôle) ou rejette depuis l'écran **Demandes d'accès**
 - Séparation stricte des fonctions Administrateur / Consultant : les pages et routes API réservées aux
   administrateurs redirigent/rejettent explicitement les Consultants (pas seulement masquées dans le menu)
-- Vue **Calendrier** mensuelle avec pastilles de validation et archivage automatique des événements passés
-- Vue **Liste** avec filtres (quartier, statut, recherche), validations en un clic
-- **Import / export CSV** des événements et des utilisateurs
+- Vue **Calendrier** mensuelle avec pastilles de validation (validée / non validée / Date Clef / Brouillon) et
+  archivage automatique des événements passés
+- Vue **Liste** avec filtres (quartier, statut, nature, recherche), validations en un clic, export PDF, et une fiche
+  détaillée au clic sur un événement
+- Vue **Carte** (géocodage automatique des lieux) et vue **Conflits** (jours avec plusieurs événements non arbitrés)
+- **Import / export CSV** des événements et des utilisateurs, avec détection et fusion des doublons
+- **Journal d'audit** : historique de toutes les actions par compte (connexions, validations, imports, suppressions,
+  sauvegardes…)
+- **Sauvegardes** automatiques (quotidienne + avant chaque opération sensible) et restauration depuis l'interface
+- **Synchronisation GitHub** : après chaque import CSV, `data/evenements.csv` est automatiquement mis à jour et
+  commité dans ce dépôt (voir `server/.env.example` — désactivée tant que `GITHUB_TOKEN` n'est pas renseigné)
 
-Volontairement laissé pour une itération suivante (voir `reference-vibe-export/` pour la logique d'origine) :
-- Vue Carte / géocodage, Vue Conflits, export PDF, journal d'audit détaillé
+Volontairement laissé de côté pour l'instant :
 - Envoi par email des mots de passe temporaires (création de compte, réinitialisation) — pour l'instant ils sont
   **affichés dans les logs serveur** ; seule la notification "nouvelle demande d'accès" est un email réel
 
 ## Arborescence
 
 ```
-data/                  CSV de base (source d'import/seed) pour événements et utilisateurs
-server/                API Express + MongoDB (Mongoose)
-client/                Frontend React (Vite)
-reference-vibe-export/ Ancien export monday Vibe, conservé comme référence fonctionnelle
-Dockerfile             Image de production (build client + serveur en une seule image)
-docker-compose.yml     Mongo + app pour un test local "à la prod"
+data/                    CSV de base (source d'import/seed) pour événements et utilisateurs
+docs/                    Documentation complémentaire (déploiement CUD, etc.)
+server/                  API Express + MongoDB (Mongoose)
+client/                  Frontend React (Vite)
+reference-vibe-export/   Ancien export monday Vibe, conservé comme référence fonctionnelle
+Dockerfile               Image de production (build client + serveur en une seule image)
+docker-compose.yml       Mongo + app pour un test local "à la prod" (dev uniquement)
+docker-compose.prod.yml  Mongo + app pour un vrai serveur (voir docs/DEPLOIEMENT-CUD.md)
+.env.prod.example        Modèle de configuration pour docker-compose.prod.yml
 ```
 
 ## Installation locale
@@ -115,7 +129,11 @@ docker compose up --build
 
 Démarre un MongoDB local + l'application buildée sur http://localhost:4000.
 
-## Déploiement web — option la moins chère
+## Déploiement — environnement de dev/démo (le moins cher)
+
+Cette section décrit l'hébergement actuel de l'environnement de **développement/démo** (utilisé pour tester chaque
+nouvelle fonctionnalité avant de la proposer en production). Pour le **déploiement en production sur les serveurs de
+la CUD**, avec reprise des données réelles actuelles, voir [`docs/DEPLOIEMENT-CUD.md`](docs/DEPLOIEMENT-CUD.md).
 
 **Base de données : MongoDB Atlas, palier gratuit M0 (0 €, 512 Mo)** — largement suffisant pour ce volume de données.
 
@@ -152,3 +170,6 @@ Démarre un MongoDB local + l'application buildée sur http://localhost:4000.
   et les variables d'environnement de l'hébergeur en production
 - `data/utilisateurs.csv` ne doit **jamais** contenir de vrais mots de passe en clair une fois committé dans un
   dépôt partagé — utilisez-le uniquement comme modèle, ou gardez la version réelle hors du contrôle de version
+
+Pour la checklist sécurité spécifique au déploiement en production sur les serveurs de la CUD (Mongo non exposé,
+`GITHUB_TOKEN` à laisser vide, etc.), voir [`docs/DEPLOIEMENT-CUD.md` §10](docs/DEPLOIEMENT-CUD.md#10-sécurité--à-valider-avant-louverture-réelle).

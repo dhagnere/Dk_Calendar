@@ -1,0 +1,38 @@
+# Compose de PRODUCTION pour les serveurs de la CUD — voir docs/DEPLOIEMENT-CUD.md pour la
+# procédure complète (première installation, seed des données, mises à jour ultérieures).
+#
+# Différences volontaires avec docker-compose.yml (celui-ci sert uniquement à un test local rapide
+# « à la prod », pas à un vrai déploiement) :
+# - Mongo n'expose aucun port sur l'hôte : uniquement accessible depuis le conteneur "app" via le
+#   réseau Docker interne. Pour un dump/restore ponctuel, publier temporairement le port en local
+#   uniquement (voir plus bas), jamais en écoute sur toutes les interfaces.
+# - Les secrets (JWT_SECRET, SMTP, etc.) viennent d'un fichier .env à la racine (voir
+#   .env.prod.example), jamais écrits en clair ici.
+# - restart: always (plutôt que unless-stopped) : redémarre aussi après un reboot du serveur.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: always
+    # Pour un dump/restore ponctuel depuis une autre machine du même réseau, ajoutez temporairement
+    # ici : ports: ["127.0.0.1:27017:27017"] (jamais "27017:27017" seul, qui écoute sur toutes les
+    # interfaces réseau du serveur) — puis retirez la ligne une fois terminé.
+    volumes:
+      - mongo_data:/data/db
+
+  app:
+    build: .
+    restart: always
+    depends_on:
+      - mongo
+    ports:
+      - '4000:4000'
+    env_file:
+      - .env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/dk_calendar
+      PORT: 4000
+      NODE_ENV: production
+
+volumes:
+  mongo_data:
