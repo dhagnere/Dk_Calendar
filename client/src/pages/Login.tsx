@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Button, Card, Image, Input, Typography } from 'antd';
-import { api } from '../api';
+import { api, ApiError } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { LOGO_DUNKERQUE_CUD } from '../logos';
 
@@ -45,6 +45,8 @@ export default function Login() {
     try {
       const res = await connexion(email, motDePasse);
       if (!res.ok) setMessage(res.message);
+    } catch (err) {
+      setMessage(err instanceof ApiError ? err.message : 'Impossible de contacter le serveur. Réessayez dans un instant.');
     } finally {
       setEnvoi(false);
     }
@@ -69,6 +71,8 @@ export default function Login() {
         setMotifDemande('');
         setVue('connexion');
       }
+    } catch (err) {
+      setMessage(err instanceof ApiError ? err.message : 'Impossible de contacter le serveur. Réessayez dans un instant.');
     } finally {
       setEnvoi(false);
     }
@@ -90,6 +94,8 @@ export default function Login() {
       } else {
         setMessage(res.message);
       }
+    } catch (err) {
+      setMessage(err instanceof ApiError ? err.message : 'Impossible de contacter le serveur. Réessayez dans un instant.');
     } finally {
       setEnvoi(false);
     }
