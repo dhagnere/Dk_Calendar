@@ -6,6 +6,7 @@ import { genererHash, verifierMotDePasse } from '../lib/password.js';
 import { signSession, setSessionCookie, clearSessionCookie } from '../lib/session.js';
 import { requireAuth } from '../middleware/auth.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
+import { estErreurCleDupliquee } from '../lib/mongoErrors.js';
 
 export const authRouter = Router();
 
@@ -48,7 +49,24 @@ authRouter.post('/initialiser-administrateur', async (req, res) => {
   const email = parsed.data.email.toLowerCase();
   const { hash, sel } = await genererHash(motDePasse);
 
-  const compte = await UserModel.create({ nom, email, role: 'Administrateur', statut: 'Actif', hash, sel });
+  // Deux requêtes quasi simultanées (double clic, ou nouvelle tentative après un aléa réseau)
+  // peuvent toutes les deux passer le contrôle « admin existe déjà » ci-dessus avant qu'aucune
+  // n'ait encore écrit en base : la seconde crée alors un doublon d'email, rejeté par l'index
+  // unique de MongoDB. Sans ce try/catch, cette erreur (non interceptée par Express) faisait
+  // planter tout le serveur pour tous les utilisateurs, pas seulement cette requête.
+  let compte;
+  try {
+    compte = await UserModel.create({ nom, email, role: 'Administrateur', statut: 'Actif', hash, sel });
+  } catch (err) {
+    if (estErreurCleDupliquee(err)) {
+      res.json({ ok: false, message: 'Un administrateur existe déjà' });
+      return;
+    }
+    console.error('[auth] Échec de la création de l’administrateur initial :', err);
+    res.status(500).json({ ok: false, message: 'Échec de la création du compte, réessayez.' });
+    return;
+  }
+
   console.log(`[auth] Administrateur initial créé : ${email}`);
   await consigner({ userId: compte.id, nom: compte.nom, email: compte.email }, 'creation_compte', email, { role: 'Administrateur', initial: true });
   res.json({ ok: true, message: 'Compte administrateur créé avec succès' });

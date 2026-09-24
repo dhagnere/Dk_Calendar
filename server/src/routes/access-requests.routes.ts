@@ -7,6 +7,7 @@ import { genererHash } from '../lib/password.js';
 import { notifierNouvelleDemandeAcces } from '../lib/email.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
+import { estErreurCleDupliquee } from '../lib/mongoErrors.js';
 
 export const accessRequestsRouter = Router();
 
@@ -101,14 +102,26 @@ accessRequestsRouter.post('/:id/approuver', async (req, res) => {
   }
 
   const { hash, sel } = await genererHash(parsed.data.motDePasseTemporaire);
-  await UserModel.create({
-    nom: demande.nom,
-    email: demande.email,
-    role: parsed.data.role,
-    statut: 'Mot de passe à définir',
-    hash,
-    sel,
-  });
+  try {
+    await UserModel.create({
+      nom: demande.nom,
+      email: demande.email,
+      role: parsed.data.role,
+      statut: 'Mot de passe à définir',
+      hash,
+      sel,
+    });
+  } catch (err) {
+    if (estErreurCleDupliquee(err)) {
+      demande.statut = 'Approuvée';
+      await demande.save();
+      res.json({ ok: false, message: 'Un compte existe déjà avec cette adresse e-mail' });
+      return;
+    }
+    console.error('[demandes-acces] Échec de la création du compte :', err);
+    res.status(500).json({ ok: false, message: 'Échec de la création du compte, réessayez.' });
+    return;
+  }
 
   demande.statut = 'Approuvée';
   await demande.save();

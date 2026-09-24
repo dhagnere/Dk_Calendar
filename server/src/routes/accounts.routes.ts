@@ -4,6 +4,7 @@ import { UserModel } from '../models/User.js';
 import { genererHash } from '../lib/password.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
+import { estErreurCleDupliquee } from '../lib/mongoErrors.js';
 
 export const accountsRouter = Router();
 
@@ -36,14 +37,24 @@ accountsRouter.post('/', async (req, res) => {
   }
 
   const { hash, sel } = await genererHash(parsed.data.motDePasseTemporaire);
-  await UserModel.create({
-    nom: parsed.data.nom,
-    email,
-    role: parsed.data.role,
-    statut: 'Mot de passe à définir',
-    hash,
-    sel,
-  });
+  try {
+    await UserModel.create({
+      nom: parsed.data.nom,
+      email,
+      role: parsed.data.role,
+      statut: 'Mot de passe à définir',
+      hash,
+      sel,
+    });
+  } catch (err) {
+    if (estErreurCleDupliquee(err)) {
+      res.json({ ok: false, message: 'Un compte existe déjà avec cette adresse e-mail' });
+      return;
+    }
+    console.error('[accounts] Échec de la création du compte :', err);
+    res.status(500).json({ ok: false, message: 'Échec de la création du compte, réessayez.' });
+    return;
+  }
 
   console.log(`[accounts] Compte créé pour ${email} (${parsed.data.role}) — mot de passe temporaire : ${parsed.data.motDePasseTemporaire}`);
   await consigner(identiteDeRequete(req), 'creation_compte', email, { role: parsed.data.role });
