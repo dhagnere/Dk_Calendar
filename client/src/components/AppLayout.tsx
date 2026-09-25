@@ -8,6 +8,7 @@ import {
   EnvironmentOutlined,
   FileTextOutlined,
   MenuOutlined,
+  SolutionOutlined,
   TeamOutlined,
   UnorderedListOutlined,
   UserAddOutlined,
@@ -79,6 +80,7 @@ export function AppLayout() {
     { key: '/liste', label: 'Liste', icone: <UnorderedListOutlined /> },
     { key: '/carte', label: 'Carte', icone: <EnvironmentOutlined /> },
     { key: '/conflits', label: 'Conflits', icone: <WarningOutlined /> },
+    { key: '/fiche-renseignement', label: 'Fiche de renseignement', icone: <SolutionOutlined /> },
     ...(estAdministrateur
       ? [
           { key: '/comptes', label: 'Comptes', icone: <TeamOutlined /> },

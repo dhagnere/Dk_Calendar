@@ -6,6 +6,7 @@ import Calendrier from './pages/Calendrier';
 import Liste from './pages/Liste';
 import Carte from './pages/Carte';
 import Conflits from './pages/Conflits';
+import FicheRenseignement from './pages/FicheRenseignement';
 import Comptes from './pages/Comptes';
 import Demandes from './pages/Demandes';
 import Sauvegardes from './pages/Sauvegardes';
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/liste" element={<Liste />} />
         <Route path="/carte" element={<Carte />} />
         <Route path="/conflits" element={<Conflits />} />
+        <Route path="/fiche-renseignement" element={<FicheRenseignement />} />
         <Route element={<RequireAdmin />}>
           <Route path="/comptes" element={<Comptes />} />
           <Route path="/demandes" element={<Demandes />} />

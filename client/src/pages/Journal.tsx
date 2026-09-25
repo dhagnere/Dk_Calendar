@@ -32,6 +32,7 @@ const LIBELLES_ACTION: Record<string, { libelle: string; couleur?: string }> = {
   suppression_evenement: { libelle: "Suppression d'événement", couleur: 'red' },
   fusion_doublons: { libelle: 'Fusion de doublons', couleur: 'orange' },
   import_evenements: { libelle: "Import d'événements", couleur: 'purple' },
+  creation_evenement: { libelle: "Création d'événement (fiche de renseignement)", couleur: 'blue' },
   import_utilisateurs: { libelle: "Import d'utilisateurs", couleur: 'purple' },
   approbation_demande_acces: { libelle: "Approbation de demande d'accès", couleur: 'green' },
   rejet_demande_acces: { libelle: "Rejet de demande d'accès", couleur: 'red' },

@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { EventModel } from '../models/Event.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { LIMITES_CUD, geocoderPlusieursAdresses } from '../lib/geocodage.js';
 import { motifRechercheInsensibleAccents } from '../lib/rechercheAccents.js';
 import { cleIdentite } from '../lib/identiteEvenement.js';
 import { creerSauvegarde } from '../lib/backup.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
 import { queryString } from '../lib/queryString.js';
+import { VALID_NATURES, VALID_NIVEAUX, VALID_OUI_NON, VALID_QUARTIERS, VALID_TYPES } from '../lib/reference-data.js';
 
 export const eventsRouter = Router();
 
@@ -115,6 +116,98 @@ eventsRouter.get('/options-filtres', async (_req, res) => {
     rows.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count }));
 
   res.json({ quartiers: format(quartiers), natures: format(natures), statuts: format(statuts), types: format(types) });
+});
+
+/** Valeurs de référence (listes fermées) pour les champs à choix de la Fiche de renseignement. */
+eventsRouter.get('/valeurs-reference', requireAuth, (_req, res) => {
+  res.json({ quartiers: VALID_QUARTIERS, natures: VALID_NATURES, niveaux: VALID_NIVEAUX, types: VALID_TYPES });
+});
+
+const schemaFicheRenseignement = z.object({
+  nom: z.string().min(1),
+  dateDeDebut: z.string().min(1),
+  dateDeFin: z.string().nullable().optional(),
+  lieu: z.string().optional(),
+  quartier: z.string().optional(),
+  pilote: z.string().optional(),
+  directionPilote: z.string().optional(),
+  organisateur: z.string().optional(),
+  nature: z.string().optional(),
+  niveau: z.string().optional(),
+  type: z.string().optional(),
+  tardive: z.enum(VALID_OUI_NON).optional(),
+  reprog: z.enum(VALID_OUI_NON).optional(),
+});
+
+/**
+ * Crée un nouvel événement depuis la « Fiche de renseignement » (formulaire de saisie manuelle,
+ * ouvert à tout compte connecté — administrateur ou consultant, comme le Calendrier ou la Liste).
+ * Un événement de plusieurs jours crée une ligne par jour occupé (même convention que le report de
+ * date, voir POST /:id/dates plus bas). L'événement créé entre dans le circuit d'arbitrage habituel
+ * (statut « À valider », non validé) : rien ne le distingue ensuite d'un événement importé par CSV.
+ */
+eventsRouter.post('/', requireAuth, async (req, res) => {
+  const parsed = schemaFicheRenseignement.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, message: 'Données invalides' });
+    return;
+  }
+
+  const nouveauDebut = parseJourCivil(parsed.data.dateDeDebut);
+  const nouveauFin = parsed.data.dateDeFin ? parseJourCivil(parsed.data.dateDeFin) : nouveauDebut;
+  if (!nouveauDebut || !nouveauFin || nouveauFin < nouveauDebut) {
+    res.status(400).json({ ok: false, message: 'Dates invalides' });
+    return;
+  }
+  const nombreJours = Math.round((nouveauFin.getTime() - nouveauDebut.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+  if (nombreJours > MAX_JOURS_REPORT) {
+    res.status(400).json({ ok: false, message: `La période ne peut pas dépasser ${MAX_JOURS_REPORT} jours` });
+    return;
+  }
+  const memeJour = nombreJours === 1;
+
+  const gabarit = {
+    nom: parsed.data.nom.trim(),
+    lieu: parsed.data.lieu?.trim() ?? '',
+    quartier: parsed.data.quartier ?? '',
+    pilote: parsed.data.pilote?.trim() ?? '',
+    directionPilote: parsed.data.directionPilote?.trim() ?? '',
+    organisateur: parsed.data.organisateur?.trim() ?? '',
+    nature: parsed.data.nature ?? '',
+    niveau: parsed.data.niveau ?? '',
+    type: parsed.data.type ?? '',
+    tardive: parsed.data.tardive ?? 'Non',
+    reprog: parsed.data.reprog ?? 'Non',
+    statut: 'À valider',
+    validationTechnique: false,
+    validationPolitique: false,
+  };
+
+  const nouvellesLignes: Record<string, unknown>[] = [];
+  for (
+    const d = new Date(nouveauDebut.getFullYear(), nouveauDebut.getMonth(), nouveauDebut.getDate());
+    d <= nouveauFin && nouvellesLignes.length < MAX_JOURS_REPORT;
+    d.setDate(d.getDate() + 1)
+  ) {
+    nouvellesLignes.push({ ...gabarit, dateClef: new Date(d), dateDeDebut: nouveauDebut, dateDeFin: memeJour ? null : nouveauFin });
+  }
+
+  // Empêche de créer un doublon d'un événement déjà en base le(s) même(s) jour(s) — même logique
+  // d'identité que l'import CSV et la détection de doublons (nom normalisé + lieu + jour).
+  const existants = await EventModel.find({}, { eventId: 1, nom: 1, lieu: 1, dateClef: 1, dateDeDebut: 1 }).lean();
+  const clesExistantes = new Set(existants.map(cleIdentite));
+  const doublon = nouvellesLignes.some((ligne) => clesExistantes.has(cleIdentite(ligne as Parameters<typeof cleIdentite>[0])));
+  if (doublon) {
+    res.status(409).json({ ok: false, message: 'Un événement du même nom existe déjà à cette date' });
+    return;
+  }
+
+  const crees = await EventModel.insertMany(nouvellesLignes);
+  await consigner(identiteDeRequete(req), 'creation_evenement', gabarit.nom, {
+    dateDeDebut: nouveauDebut,
+    dateDeFin: memeJour ? null : nouveauFin,
+  });
+  res.json({ ok: true, items: crees });
 });
 
 /**
