@@ -5,10 +5,27 @@ import { formatTitreEvenement } from './formatTitre';
 import { formatDate, majusculeInitiale } from './formatDate';
 import { formatDuree } from './formatDuree';
 import { chargerLogoPourPdf, type LogoCharge } from './logosPdf';
+import { COULEUR_VALIDE, COULEUR_NON_VALIDE, COULEUR_DATE_CLEF } from './validationColors';
 
 const TITRE_APP = 'Calendrier Événements Dunkerque';
 const MARGE = 40;
 const HAUTEUR_LOGO = 28;
+
+/** Convertit une couleur hex ("#52c41a") en triplet RGB pour `setTextColor`/`textColor` de jsPDF. */
+function hexVersRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+const RGB_VALIDE = hexVersRgb(COULEUR_VALIDE);
+const RGB_NON_VALIDE = hexVersRgb(COULEUR_NON_VALIDE);
+const RGB_DATE_CLEF = hexVersRgb(COULEUR_DATE_CLEF);
+
+/** Libellé + couleur de validation d'un événement, même priorité que `ValidationBadge` (Date Clef d'abord). */
+function validationEvenement(e: Evenement): { texte: string; couleur: [number, number, number] } {
+  if (e.validParDateClef) return { texte: 'Date Clef', couleur: RGB_DATE_CLEF };
+  return estValide(e) ? { texte: 'Validée', couleur: RGB_VALIDE } : { texte: 'Non validée', couleur: RGB_NON_VALIDE };
+}
 
 /**
  * jspdf-autotable pose `finalY` sur `doc.lastAutoTable` en effet de bord (non typé dans ses .d.ts,
@@ -78,6 +95,7 @@ export async function exporterFicheJourPdf(jour: Date, evenements: Evenement[]):
   }
 
   for (const e of evenements) {
+    const validation = validationEvenement(e);
     autoTable(doc, {
       startY: y,
       margin: { left: MARGE, right: MARGE },
@@ -108,7 +126,7 @@ export async function exporterFicheJourPdf(jour: Date, evenements: Evenement[]):
         ['Organisateur', e.organisateur || '—'],
         ['Type', e.type || '—'],
         ['Période', formatDuree(e) ?? formatDate(e.dateDeDebut)],
-        ['Validation', estValide(e) ? 'Validée' : 'Non validée'],
+        ['Validation', { content: validation.texte, styles: { textColor: validation.couleur } }],
       ],
     });
     y = finalYDe(doc) + 16;
@@ -142,11 +160,12 @@ export async function exporterListePdf(lignes: LigneExportPdf[]): Promise<void> 
       ];
     }
     const e = ligne.evenement;
+    const validation = validationEvenement(e);
     return [
       formatTitreEvenement(e.nom),
       e.quartier || '—',
       e.nature || '—',
-      estValide(e) ? 'Validée' : 'Non validée',
+      { content: validation.texte, styles: { textColor: validation.couleur } },
       formatDuree(e) ?? formatDate(e.dateDeDebut),
     ];
   });
