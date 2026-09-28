@@ -290,7 +290,11 @@ export default function Liste() {
             options={[
               { value: 'ALL', label: 'Tous' },
               { value: 'Validée', label: 'Validée' },
-              ...options.statuts.map((s) => ({ value: s.label, label: s.label })),
+              // "Validée" est déjà ajouté ci-dessus (avec une signification particulière : les deux
+              // validations cochées, pas juste le champ statut — voir la route /evenements) : sans ce
+              // filtre, elle apparaîtrait une seconde fois ici puisque la quasi-totalité des
+              // événements en base ont justement ce statut.
+              ...options.statuts.filter((s) => s.label !== 'Validée').map((s) => ({ value: s.label, label: s.label })),
             ]}
           />
         </div>
