@@ -5,6 +5,7 @@ import { UserModel } from '../models/User.js';
 import { genererHash, genererSel } from '../lib/password.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import {
+  decoderCsv,
   parseEventsCsv,
   stringifyEventsCsv,
   parseUsersCsv,
@@ -43,7 +44,7 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
   }
 
   try {
-    const { rows, errors } = parseEventsCsv(req.file.buffer.toString('utf-8'));
+    const { rows, errors } = parseEventsCsv(decoderCsv(req.file.buffer));
 
     await creerSauvegarde('avant-import-evenements');
 
@@ -112,7 +113,7 @@ importRouter.post('/utilisateurs', requireAdmin, upload.single('fichier'), async
   }
 
   try {
-    const { rows, errors } = parseUsersCsv(req.file.buffer.toString('utf-8'));
+    const { rows, errors } = parseUsersCsv(decoderCsv(req.file.buffer));
 
     await creerSauvegarde('avant-import-utilisateurs');
 

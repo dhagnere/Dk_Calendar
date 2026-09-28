@@ -1,6 +1,26 @@
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 
+/**
+ * Décode un fichier CSV importé en devinant son encodage réel, au lieu de supposer de l'UTF-8 à
+ * l'aveugle. Un export Excel « brut » en français est très souvent enregistré en Windows-1252 (les
+ * lettres accentuées y occupent un seul octet, ex. 0xE8 pour « è »), pas en UTF-8 : le décoder quand
+ * même comme de l'UTF-8 ne provoque aucune erreur visible, mais remplace silencieusement chaque
+ * octet invalide par le caractère de remplacement « � » (U+FFFD) — une perte d'information
+ * définitive, impossible à corriger après coup une fois le fichier réenregistré. C'est très
+ * probablement l'origine des « � » déjà présents dans des événements importés par le passé.
+ *
+ * Ici, on tente d'abord un décodage UTF-8 strict (qui échoue net sur la moindre séquence invalide,
+ * contrairement à Buffer.toString('utf-8')) ; s'il échoue, on retombe sur Windows-1252.
+ */
+export function decoderCsv(buffer: Buffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer);
+  }
+}
+
 /** Colonnes du CSV des événements (correspondance directe avec le modèle Event). */
 export const EVENT_CSV_COLUMNS = [
   'eventId',
@@ -188,12 +208,23 @@ export function parseEventsCsv(content: string): { rows: EventCsvRow[]; errors: 
       errors.push(`Ligne ${index + 2} ignorée : nom manquant`);
       return;
     }
+    // Une ligne avec une date de fin renseignée mais pas de date de début (erreur de saisie dans le
+    // fichier source) ne pourrait ensuite apparaître dans aucune case du Calendrier, qui ne sait
+    // placer un événement que par dateClef ou dateDeDebut : on retombe alors sur la date de fin comme
+    // date de début, plutôt que de laisser l'événement sans date du tout.
+    let dateDeDebut = parseDateFr(record.dateDeDebut);
+    let dateDeFin = parseDateFr(record.dateDeFin);
+    if (!dateDeDebut && dateDeFin) {
+      dateDeDebut = dateDeFin;
+      dateDeFin = null;
+    }
+
     rows.push({
       eventId: record.eventId?.trim() ?? '',
       dateClef: parseDateFr(record.dateClef),
       nom,
-      dateDeDebut: parseDateFr(record.dateDeDebut),
-      dateDeFin: parseDateFr(record.dateDeFin),
+      dateDeDebut,
+      dateDeFin,
       lieu: record.lieu?.trim() ?? '',
       quartier: record.quartier?.trim() ?? '',
       pilote: record.pilote?.trim() ?? '',
