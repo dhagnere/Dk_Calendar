@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Button, Checkbox, Grid, Input, Modal, Popconfirm, Select, Switch, Table, Typography, type TableColumnsType } from 'antd';
+import {
+  Button,
+  Checkbox,
+  DatePicker,
+  Grid,
+  Input,
+  Modal,
+  Popconfirm,
+  Select,
+  Switch,
+  Table,
+  Typography,
+  type TableColumnsType,
+} from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
+import type { Dayjs } from 'dayjs';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Evenement } from '../types';
@@ -15,6 +29,7 @@ import { exporterListePdf } from '../lib/pdf';
 
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
+const { RangePicker } = DatePicker;
 
 const MOIS_FR = [
   'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
@@ -93,6 +108,7 @@ export default function Liste() {
   const [quartier, setQuartier] = useState('ALL');
   const [statut, setStatut] = useState('ALL');
   const [nature, setNature] = useState('ALL');
+  const [periode, setPeriode] = useState<[Dayjs, Dayjs] | null>(null);
   const [avecEvenementsArchives, setAvecEvenementsArchives] = useState(false);
   const [evenementOuvertId, setEvenementOuvertId] = useState<string | null>(null);
   const [options, setOptions] = useState<{
@@ -163,8 +179,24 @@ export default function Liste() {
   };
 
   const evenementsGroupes = useMemo(() => regrouperParEvenement(evenements), [evenements]);
-  const total = evenementsGroupes.length;
-  const lignes = useMemo(() => regrouperParSemaine(evenementsGroupes), [evenementsGroupes]);
+  /**
+   * Filtre par période (dateDeDebut, dateClef en repli — même champ que celui utilisé pour le
+   * regroupement par semaine ci-dessous), appliqué côté client car il porte sur la même donnée déjà
+   * chargée pour l'affichage plutôt que sur un nouveau critère serveur.
+   */
+  const evenementsPeriode = useMemo(() => {
+    if (!periode) return evenementsGroupes;
+    const debutMs = periode[0].startOf('day').valueOf();
+    const finMs = periode[1].endOf('day').valueOf();
+    return evenementsGroupes.filter((e) => {
+      const date = e.dateDeDebut ?? e.dateClef;
+      if (!date) return false;
+      const t = new Date(date).getTime();
+      return t >= debutMs && t <= finMs;
+    });
+  }, [evenementsGroupes, periode]);
+  const total = evenementsPeriode.length;
+  const lignes = useMemo(() => regrouperParSemaine(evenementsPeriode), [evenementsPeriode]);
 
   /** Colonnes « normales », appliquées uniquement aux lignes de type événement. */
   const colonnesEvenement: { title: string; key: string; width?: number; render: (e: Evenement) => ReactNode }[] = [
@@ -305,6 +337,16 @@ export default function Liste() {
             onChange={setNature}
             style={{ width: '100%' }}
             options={[{ value: 'ALL', label: 'Toutes' }, ...options.natures.map((n) => ({ value: n.label, label: n.label }))]}
+          />
+        </div>
+        <div style={{ minWidth: mobile ? '100%' : 260, flex: mobile ? '1 0 100%' : undefined }}>
+          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>Période</div>
+          <RangePicker
+            value={periode}
+            onChange={(valeurs) => setPeriode(valeurs && valeurs[0] && valeurs[1] ? [valeurs[0], valeurs[1]] : null)}
+            format="DD/MM/YYYY"
+            style={{ width: '100%' }}
+            allowClear
           />
         </div>
         <Switch
