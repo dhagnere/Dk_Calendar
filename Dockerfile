@@ -21,6 +21,7 @@ COPY client/package.json ./client/package.json
 COPY server/package.json ./server/package.json
 RUN npm ci --omit=dev --workspace=server
 COPY --from=build /app/server/dist ./server/dist
+COPY server/migrations ./server/migrations
 COPY --from=build /app/client/dist ./client/dist
 COPY data ./data
 

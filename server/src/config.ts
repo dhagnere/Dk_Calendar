@@ -20,6 +20,9 @@ const jwtSecret = isProduction
 
 export const config = {
   port: parseInt(process.env.PORT ?? '4000', 10),
+  // Chaîne de connexion PostgreSQL, ex. postgres://utilisateur:motdepasse@hote:5432/dk_calendar
+  // (ajouter ?sslmode=require si l'hébergeur impose une connexion chiffrée).
+  databaseUrl: required('DATABASE_URL', 'postgres://postgres@127.0.0.1:5432/dk_calendar'),
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/dk_calendar'),
   jwtSecret,
   cookieName: 'dk_session',
