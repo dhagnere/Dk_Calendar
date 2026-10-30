@@ -117,6 +117,17 @@ function valeurSql(table: NomTable, champ: string, valeur: unknown): unknown {
   return (TABLES[table].json as string[]).includes(champ) && valeur !== null ? JSON.stringify(valeur) : valeur;
 }
 
+/**
+ * Prépare pour `inserer` un objet venu de l'extérieur (sauvegarde JSON, export MongoDB…) : seules les
+ * colonnes connues de la table sont gardées (ce qui écarte par ex. le `__v` de Mongoose) et les
+ * valeurs nulles sont retirées, la colonne prenant alors sa valeur par défaut — NULL pour une date,
+ * '' ou 'attente' pour un texte obligatoire.
+ */
+export function preparerLigne(table: NomTable, objet: Record<string, unknown>): Ligne {
+  const colonnes = TABLES[table].colonnes as string[];
+  return Object.fromEntries(Object.entries(objet).filter(([cle, valeur]) => colonnes.includes(cle) && valeur !== null));
+}
+
 /** Nombre de lignes par INSERT, pour rester loin de la limite de 65 535 paramètres par requête. */
 const LOT_INSERTION = 500;
 

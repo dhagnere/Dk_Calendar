@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { BackupModel } from '../models/Backup.js';
-import { EventModel } from '../models/Event.js';
-import { UserModel } from '../models/User.js';
+import { executer, inserer, preparerLigne, requete, requeteUne, transaction } from '../db.js';
+import type { Sauvegarde } from '../modeles.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { creerSauvegarde } from '../lib/backup.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
@@ -14,7 +13,9 @@ backupsRouter.use(requireAdmin);
 
 /** Liste les sauvegardes (métadonnées seulement, sans le contenu). */
 backupsRouter.get('/', async (_req, res) => {
-  const sauvegardes = await BackupModel.find({}, { evenements: 0, utilisateurs: 0 }).sort({ createdAt: -1 }).lean();
+  const sauvegardes = await requete(
+    'SELECT id, type, nombre_evenements, nombre_utilisateurs, created_at, updated_at FROM sauvegardes ORDER BY created_at DESC'
+  );
   res.json({ sauvegardes });
 });
 
@@ -27,7 +28,7 @@ backupsRouter.post('/', async (req, res) => {
 
 /** Télécharge le contenu complet d'une sauvegarde au format JSON. */
 backupsRouter.get('/:id/export', async (req, res) => {
-  const sauvegarde = await BackupModel.findById(req.params.id).lean();
+  const sauvegarde = await requeteUne<Sauvegarde>('SELECT * FROM sauvegardes WHERE id = $1', [req.params.id]);
   if (!sauvegarde) {
     res.status(404).json({ ok: false, message: 'Sauvegarde introuvable' });
     return;
@@ -43,7 +44,7 @@ backupsRouter.get('/:id/export', async (req, res) => {
  * créée juste avant, pour permettre d'annuler la restauration elle-même si besoin.
  */
 backupsRouter.post('/:id/restaurer', async (req, res) => {
-  const sauvegarde = await BackupModel.findById(req.params.id).lean();
+  const sauvegarde = await requeteUne<Sauvegarde>('SELECT * FROM sauvegardes WHERE id = $1', [req.params.id]);
   if (!sauvegarde) {
     res.status(404).json({ ok: false, message: 'Sauvegarde introuvable' });
     return;
@@ -51,11 +52,14 @@ backupsRouter.post('/:id/restaurer', async (req, res) => {
 
   await creerSauvegarde('avant-restauration');
 
-  await EventModel.deleteMany({});
-  if (sauvegarde.evenements.length > 0) await EventModel.insertMany(sauvegarde.evenements);
-
-  await UserModel.deleteMany({});
-  if (sauvegarde.utilisateurs.length > 0) await UserModel.insertMany(sauvegarde.utilisateurs);
+  // Les identifiants d'origine sont conservés (les sessions ouvertes restent valides). Tout se fait
+  // dans une transaction : en cas d'erreur, les données actuelles restent intactes.
+  await transaction(async (client) => {
+    await executer('DELETE FROM evenements', [], client);
+    await inserer('evenements', sauvegarde.evenements.map((e) => preparerLigne('evenements', e)), client);
+    await executer('DELETE FROM utilisateurs', [], client);
+    await inserer('utilisateurs', sauvegarde.utilisateurs.map((u) => preparerLigne('utilisateurs', u)), client);
+  });
 
   console.log(
     `[backup] Restauration depuis la sauvegarde ${sauvegarde._id} (${sauvegarde.evenements.length} événements, ${sauvegarde.utilisateurs.length} utilisateurs)`
@@ -63,7 +67,7 @@ backupsRouter.post('/:id/restaurer', async (req, res) => {
   await consigner(
     identiteDeRequete(req),
     'restauration_sauvegarde',
-    `sauvegarde du ${new Date(sauvegarde.createdAt as unknown as string).toLocaleString('fr-FR')}`
+    `sauvegarde du ${sauvegarde.createdAt.toLocaleString('fr-FR')}`
   );
   res.json({ ok: true, message: 'Restauration effectuée' });
 });
