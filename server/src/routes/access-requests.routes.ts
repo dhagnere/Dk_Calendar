@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
-import { AccessRequestModel } from '../models/AccessRequest.js';
-import { UserModel } from '../models/User.js';
+import { insererUn, requete, requeteUne, transaction } from '../db.js';
+import type { DemandeAcces } from '../modeles.js';
 import { genererHash } from '../lib/password.js';
 import { notifierNouvelleDemandeAcces } from '../lib/email.js';
 import { requireAdmin } from '../middleware/auth.js';
@@ -35,19 +35,21 @@ accessRequestsRouter.post('/', limiteurDemandeAcces, async (req, res) => {
 
   const email = parsed.data.email.toLowerCase();
 
-  const compteExistant = await UserModel.findOne({ email });
+  const compteExistant = await requeteUne('SELECT 1 FROM utilisateurs WHERE email = $1', [email]);
   if (compteExistant) {
     res.json({ ok: false, message: 'Un compte existe déjà avec cette adresse e-mail' });
     return;
   }
 
-  const demandeExistante = await AccessRequestModel.findOne({ email, statut: 'En attente' });
+  const demandeExistante = await requeteUne("SELECT 1 FROM demandes_acces WHERE email = $1 AND statut = 'En attente'", [
+    email,
+  ]);
   if (demandeExistante) {
     res.json({ ok: false, message: 'Une demande est déjà en attente pour cette adresse e-mail' });
     return;
   }
 
-  await AccessRequestModel.create({
+  await insererUn('demandes_acces', {
     nom: parsed.data.nom,
     email,
     organisation: parsed.data.organisation ?? '',
@@ -70,7 +72,7 @@ accessRequestsRouter.use(requireAdmin);
 
 /** Liste les demandes en attente. */
 accessRequestsRouter.get('/', async (_req, res) => {
-  const demandes = await AccessRequestModel.find({ statut: 'En attente' }).sort({ createdAt: 1 }).lean();
+  const demandes = await requete("SELECT * FROM demandes_acces WHERE statut = 'En attente' ORDER BY created_at");
   res.json({ demandes });
 });
 
@@ -86,32 +88,32 @@ accessRequestsRouter.post('/:id/approuver', async (req, res) => {
     return;
   }
 
-  const demande = await AccessRequestModel.findById(req.params.id);
+  const demande = await requeteUne<DemandeAcces>('SELECT * FROM demandes_acces WHERE id = $1', [req.params.id]);
   if (!demande || demande.statut !== 'En attente') {
     res.status(404).json({ ok: false, message: 'Demande introuvable ou déjà traitée' });
     return;
   }
 
-  const compteExistant = await UserModel.findOne({ email: demande.email });
+  const marquerApprouvee = (executant?: Parameters<typeof requete>[2]) =>
+    requete("UPDATE demandes_acces SET statut = 'Approuvée' WHERE id = $1", [demande._id], executant);
+
+  const compteExistant = await requeteUne('SELECT 1 FROM utilisateurs WHERE email = $1', [demande.email]);
   if (compteExistant) {
-    demande.statut = 'Approuvée';
-    await demande.save();
+    await marquerApprouvee();
     res.json({ ok: false, message: 'Un compte existe déjà avec cette adresse e-mail' });
     return;
   }
 
+  // Création du compte et clôture de la demande vont ensemble : jamais l'un sans l'autre.
   const { hash, sel } = await genererHash(parsed.data.motDePasseTemporaire);
-  await UserModel.create({
-    nom: demande.nom,
-    email: demande.email,
-    role: parsed.data.role,
-    statut: 'Mot de passe à définir',
-    hash,
-    sel,
+  await transaction(async (client) => {
+    await insererUn(
+      'utilisateurs',
+      { nom: demande.nom, email: demande.email, role: parsed.data.role, statut: 'Mot de passe à définir', hash, sel },
+      client
+    );
+    await marquerApprouvee(client);
   });
-
-  demande.statut = 'Approuvée';
-  await demande.save();
 
   console.log(`[demandes-acces] Demande approuvée pour ${demande.email} (${parsed.data.role}) — mot de passe temporaire : ${parsed.data.motDePasseTemporaire}`);
   await consigner(identiteDeRequete(req), 'approbation_demande_acces', demande.email, { role: parsed.data.role });
@@ -127,10 +129,9 @@ accessRequestsRouter.post('/:id/rejeter', async (req, res) => {
     return;
   }
 
-  const demande = await AccessRequestModel.findByIdAndUpdate(
-    req.params.id,
-    { statut: 'Rejetée', motifRejet: parsed.data.motifRejet ?? '' },
-    { new: true }
+  const demande = await requeteUne<DemandeAcces>(
+    "UPDATE demandes_acces SET statut = 'Rejetée', motif_rejet = $2 WHERE id = $1 RETURNING email",
+    [req.params.id, parsed.data.motifRejet ?? '']
   );
   if (!demande) {
     res.status(404).json({ ok: false, message: 'Demande introuvable' });

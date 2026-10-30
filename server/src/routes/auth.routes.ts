@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
-import { UserModel } from '../models/User.js';
+import { insererUn, requete, requeteUne } from '../db.js';
+import type { Utilisateur } from '../modeles.js';
 import { genererHash, verifierMotDePasse } from '../lib/password.js';
 import { signSession, setSessionCookie, clearSessionCookie } from '../lib/session.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -20,9 +21,12 @@ const limiteurConnexion = rateLimit({
 
 /** Existe-t-il déjà un administrateur actif ? (contrôle affiché à l'écran de connexion) */
 authRouter.get('/existe-administrateur', async (_req, res) => {
-  const nombreComptes = await UserModel.countDocuments({});
-  const admin = await UserModel.findOne({ role: 'Administrateur', statut: 'Actif' });
-  res.json({ existe: !!admin, nombreComptes });
+  const [{ nombreComptes, existe }] = await requete<{ nombreComptes: number; existe: boolean }>(
+    `SELECT count(*) AS nombre_comptes,
+            bool_or(role = 'Administrateur' AND statut = 'Actif') IS TRUE AS existe
+       FROM utilisateurs`
+  );
+  res.json({ existe, nombreComptes });
 });
 
 /** Initialise le tout premier compte administrateur. */
@@ -38,7 +42,7 @@ authRouter.post('/initialiser-administrateur', async (req, res) => {
     return;
   }
 
-  const admin = await UserModel.findOne({ role: 'Administrateur', statut: 'Actif' });
+  const admin = await requeteUne("SELECT 1 FROM utilisateurs WHERE role = 'Administrateur' AND statut = 'Actif' LIMIT 1");
   if (admin) {
     res.json({ ok: false, message: 'Un administrateur existe déjà' });
     return;
@@ -48,9 +52,9 @@ authRouter.post('/initialiser-administrateur', async (req, res) => {
   const email = parsed.data.email.toLowerCase();
   const { hash, sel } = await genererHash(motDePasse);
 
-  const compte = await UserModel.create({ nom, email, role: 'Administrateur', statut: 'Actif', hash, sel });
+  const compte = await insererUn<Utilisateur>('utilisateurs', { nom, email, role: 'Administrateur', statut: 'Actif', hash, sel });
   console.log(`[auth] Administrateur initial créé : ${email}`);
-  await consigner({ userId: compte.id, nom: compte.nom, email: compte.email }, 'creation_compte', email, { role: 'Administrateur', initial: true });
+  await consigner({ userId: compte._id, nom: compte.nom, email: compte.email }, 'creation_compte', email, { role: 'Administrateur', initial: true });
   res.json({ ok: true, message: 'Compte administrateur créé avec succès' });
 });
 
@@ -64,7 +68,7 @@ authRouter.post('/connexion', limiteurConnexion, async (req, res) => {
   }
 
   const email = parsed.data.email.toLowerCase();
-  const compte = await UserModel.findOne({ email });
+  const compte = await requeteUne<Utilisateur>('SELECT * FROM utilisateurs WHERE email = $1', [email]);
 
   if (!compte) {
     console.log(`[auth] Connexion échouée (compte introuvable) : ${email}`);
@@ -85,15 +89,14 @@ authRouter.post('/connexion', limiteurConnexion, async (req, res) => {
     return;
   }
 
-  compte.derniereConnexion = new Date();
-  await compte.save();
+  await requete('UPDATE utilisateurs SET derniere_connexion = now() WHERE id = $1', [compte._id]);
 
-  const role = compte.role as 'Administrateur' | 'Consultant';
-  const token = signSession({ userId: compte.id, email: compte.email, nom: compte.nom, role });
+  const role = compte.role;
+  const token = signSession({ userId: compte._id, email: compte.email, nom: compte.nom, role });
   setSessionCookie(res, token);
 
   console.log(`[auth] Connexion réussie : ${email} (${role})`);
-  await consigner({ userId: compte.id, nom: compte.nom, email: compte.email }, 'connexion', email);
+  await consigner({ userId: compte._id, nom: compte.nom, email: compte.email }, 'connexion', email);
   res.json({ ok: true, message: 'Connexion réussie', session: { email: compte.email, nom: compte.nom, role } });
 });
 
@@ -117,7 +120,7 @@ authRouter.post('/changer-mot-de-passe', requireAuth, async (req, res) => {
     return;
   }
 
-  const compte = await UserModel.findOne({ email: req.session!.email });
+  const compte = await requeteUne<Utilisateur>('SELECT * FROM utilisateurs WHERE email = $1', [req.session!.email]);
   if (!compte) {
     res.status(404).json({ ok: false, message: 'Compte introuvable' });
     return;
@@ -130,10 +133,7 @@ authRouter.post('/changer-mot-de-passe', requireAuth, async (req, res) => {
   }
 
   const { hash, sel } = await genererHash(parsed.data.nouveauMotDePasse);
-  compte.hash = hash;
-  compte.sel = sel;
-  compte.statut = 'Actif';
-  await compte.save();
+  await requete("UPDATE utilisateurs SET hash = $2, sel = $3, statut = 'Actif' WHERE id = $1", [compte._id, hash, sel]);
 
   await consigner(identiteDeRequete(req), 'changement_mot_de_passe', compte.email);
   res.json({ ok: true, message: 'Mot de passe changé avec succès' });

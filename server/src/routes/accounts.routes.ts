@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { UserModel } from '../models/User.js';
+import { insererUn, requete, requeteUne } from '../db.js';
+import type { Utilisateur } from '../modeles.js';
 import { genererHash } from '../lib/password.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { consigner, identiteDeRequete } from '../lib/journal.js';
@@ -11,7 +12,9 @@ export const accountsRouter = Router();
 accountsRouter.use(requireAdmin);
 
 accountsRouter.get('/', async (_req, res) => {
-  const comptes = await UserModel.find({}, { hash: 0, sel: 0 }).sort({ nom: 1 }).lean();
+  const comptes = await requete(
+    'SELECT id, nom, email, role, statut, derniere_connexion, created_at, updated_at FROM utilisateurs ORDER BY nom'
+  );
   res.json({ comptes });
 });
 
@@ -29,14 +32,14 @@ accountsRouter.post('/', async (req, res) => {
   }
 
   const email = parsed.data.email.toLowerCase();
-  const existant = await UserModel.findOne({ email });
+  const existant = await requeteUne('SELECT 1 FROM utilisateurs WHERE email = $1', [email]);
   if (existant) {
     res.json({ ok: false, message: 'Un compte existe déjà avec cette adresse e-mail' });
     return;
   }
 
   const { hash, sel } = await genererHash(parsed.data.motDePasseTemporaire);
-  await UserModel.create({
+  await insererUn('utilisateurs', {
     nom: parsed.data.nom,
     email,
     role: parsed.data.role,
@@ -57,7 +60,10 @@ accountsRouter.post('/:id/statut', async (req, res) => {
     res.status(400).json({ ok: false, message: 'Données invalides' });
     return;
   }
-  const updated = await UserModel.findByIdAndUpdate(req.params.id, { statut: parsed.data.statut }, { new: true });
+  const updated = await requeteUne<Utilisateur>('UPDATE utilisateurs SET statut = $2 WHERE id = $1 RETURNING email', [
+    req.params.id,
+    parsed.data.statut,
+  ]);
   if (!updated) {
     res.status(404).json({ ok: false, message: 'Compte introuvable' });
     return;
@@ -76,7 +82,7 @@ accountsRouter.delete('/:id', async (req, res) => {
     res.status(400).json({ ok: false, message: 'Vous ne pouvez pas supprimer votre propre compte' });
     return;
   }
-  const supprime = await UserModel.findByIdAndDelete(req.params.id);
+  const supprime = await requeteUne<Utilisateur>('DELETE FROM utilisateurs WHERE id = $1 RETURNING email', [req.params.id]);
   if (!supprime) {
     res.status(404).json({ ok: false, message: 'Compte introuvable' });
     return;
@@ -93,16 +99,15 @@ accountsRouter.post('/:id/reinitialiser-mot-de-passe', async (req, res) => {
     res.status(400).json({ ok: false, message: 'Données invalides' });
     return;
   }
-  const compte = await UserModel.findById(req.params.id);
+  const { hash, sel } = await genererHash(parsed.data.nouveauMotDePasseTemporaire);
+  const compte = await requeteUne<Utilisateur>(
+    "UPDATE utilisateurs SET hash = $2, sel = $3, statut = 'Mot de passe à définir' WHERE id = $1 RETURNING email",
+    [req.params.id, hash, sel]
+  );
   if (!compte) {
     res.status(404).json({ ok: false, message: 'Compte introuvable' });
     return;
   }
-  const { hash, sel } = await genererHash(parsed.data.nouveauMotDePasseTemporaire);
-  compte.hash = hash;
-  compte.sel = sel;
-  compte.statut = 'Mot de passe à définir';
-  await compte.save();
 
   console.log(`[accounts] Mot de passe réinitialisé pour ${compte.email} — temporaire : ${parsed.data.nouveauMotDePasseTemporaire}`);
   await consigner(identiteDeRequete(req), 'reinitialisation_mot_de_passe', compte.email);

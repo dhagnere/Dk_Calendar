@@ -118,8 +118,8 @@ const LOT_INSERTION = 500;
  * Insère des objets (champs en camelCase) et renvoie les lignes créées. Un champ absent ou
  * `undefined` prend la valeur par défaut de la colonne, comme avec Mongoose.
  */
-export async function inserer(table: NomTable, objets: Ligne[], executant: Executant = pool): Promise<Ligne[]> {
-  const creees: Ligne[] = [];
+export async function inserer<T = Ligne>(table: NomTable, objets: Ligne[], executant: Executant = pool): Promise<T[]> {
+  const creees: T[] = [];
   for (let debut = 0; debut < objets.length; debut += LOT_INSERTION) {
     const lot = objets.slice(debut, debut + LOT_INSERTION);
     const champs = [...new Set(lot.flatMap((o) => Object.keys(o).filter((c) => o[c] !== undefined)))];
@@ -139,14 +139,14 @@ export async function inserer(table: NomTable, objets: Ligne[], executant: Execu
       champs.length === 0
         ? `INSERT INTO ${table} DEFAULT VALUES RETURNING *`
         : `INSERT INTO ${table} (${colonnes}) VALUES ${valeurs.join(', ')} RETURNING *`;
-    creees.push(...(await requete(texte, params, executant)));
+    creees.push(...(await requete<T>(texte, params, executant)));
   }
   return creees;
 }
 
 /** Variante de `inserer` pour un seul objet. */
-export async function insererUn(table: NomTable, objet: Ligne, executant: Executant = pool): Promise<Ligne> {
-  const [ligne] = await inserer(table, [objet], executant);
+export async function insererUn<T = Ligne>(table: NomTable, objet: Ligne, executant: Executant = pool): Promise<T> {
+  const [ligne] = await inserer<T>(table, [objet], executant);
   return ligne;
 }
 
