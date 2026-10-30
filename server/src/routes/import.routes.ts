@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { EventModel } from '../models/Event.js';
-import { UserModel } from '../models/User.js';
+import { inserer, insererUn, requete, requeteUne, transaction } from '../db.js';
+import type { Evenement, Utilisateur } from '../modeles.js';
 import { genererHash, genererSel } from '../lib/password.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import {
@@ -47,7 +47,7 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
 
     await creerSauvegarde('avant-import-evenements');
 
-    const existants = await EventModel.find({}, { eventId: 1, nom: 1, lieu: 1, dateClef: 1, dateDeDebut: 1 }).lean();
+    const existants = await requete<Evenement>('SELECT event_id, nom, lieu, date_clef, date_de_debut FROM evenements');
     const clesExistantes = new Set(existants.map(cleIdentite));
 
     const clesVues = new Set<string>();
@@ -64,8 +64,9 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
       aCreer.push(row);
     }
 
+    // Tout le fichier est inséré, ou rien : pas d'import à moitié fait en cas d'erreur.
     if (aCreer.length > 0) {
-      await EventModel.insertMany(aCreer, { ordered: false });
+      await transaction((client) => inserer('evenements', aCreer, client));
     }
 
     const created = aCreer.length;
@@ -97,7 +98,7 @@ importRouter.post('/evenements', requireAdmin, upload.single('fichier'), async (
 
 /** Exporte tous les événements au format CSV. */
 importRouter.get('/evenements/export', requireAuth, async (_req, res) => {
-  const events = await EventModel.find({}).sort({ nom: 1 }).lean();
+  const events = await requete<Evenement>('SELECT * FROM evenements ORDER BY nom');
   const csv = stringifyEventsCsv(events);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="evenements.csv"');
@@ -120,36 +121,40 @@ importRouter.post('/utilisateurs', requireAdmin, upload.single('fichier'), async
     let updated = 0;
     const motsDePasseGeneres: Array<{ email: string; motDePasse: string }> = [];
 
-    for (const row of rows) {
-      const existant = await UserModel.findOne({ email: row.email });
+    // Une seule transaction pour tout le fichier : une ligne en erreur annule l'ensemble.
+    await transaction(async (client) => {
+      for (const row of rows) {
+        const existant = await requeteUne<Utilisateur>('SELECT id FROM utilisateurs WHERE email = $1', [row.email], client);
 
-      if (existant) {
-        existant.nom = row.nom;
-        existant.role = row.role as 'Administrateur' | 'Consultant';
-        existant.statut = row.statut;
-        if (row.motDePasseInitial) {
-          const { hash, sel } = await genererHash(row.motDePasseInitial);
-          existant.hash = hash;
-          existant.sel = sel;
-          existant.statut = 'Mot de passe à définir';
+        if (existant) {
+          if (row.motDePasseInitial) {
+            const { hash, sel } = await genererHash(row.motDePasseInitial);
+            await requete(
+              "UPDATE utilisateurs SET nom = $2, role = $3, statut = 'Mot de passe à définir', hash = $4, sel = $5 WHERE id = $1",
+              [existant._id, row.nom, row.role, hash, sel],
+              client
+            );
+          } else {
+            await requete(
+              'UPDATE utilisateurs SET nom = $2, role = $3, statut = $4 WHERE id = $1',
+              [existant._id, row.nom, row.role, row.statut],
+              client
+            );
+          }
+          updated++;
+        } else {
+          const motDePasse = row.motDePasseInitial || genererSel().slice(0, 12);
+          const { hash, sel } = await genererHash(motDePasse);
+          await insererUn(
+            'utilisateurs',
+            { nom: row.nom, email: row.email, role: row.role, statut: 'Mot de passe à définir', hash, sel },
+            client
+          );
+          motsDePasseGeneres.push({ email: row.email, motDePasse });
+          created++;
         }
-        await existant.save();
-        updated++;
-      } else {
-        const motDePasse = row.motDePasseInitial || genererSel().slice(0, 12);
-        const { hash, sel } = await genererHash(motDePasse);
-        await UserModel.create({
-          nom: row.nom,
-          email: row.email,
-          role: row.role,
-          statut: 'Mot de passe à définir',
-          hash,
-          sel,
-        });
-        motsDePasseGeneres.push({ email: row.email, motDePasse });
-        created++;
       }
-    }
+    });
 
     if (motsDePasseGeneres.length > 0) {
       console.log('[import] Mots de passe temporaires générés :', motsDePasseGeneres);
@@ -171,7 +176,7 @@ importRouter.post('/utilisateurs', requireAdmin, upload.single('fichier'), async
 
 /** Exporte tous les utilisateurs (sans mot de passe) au format CSV. */
 importRouter.get('/utilisateurs/export', requireAdmin, async (_req, res) => {
-  const users = await UserModel.find({}).sort({ nom: 1 }).lean();
+  const users = await requete<Utilisateur>('SELECT * FROM utilisateurs ORDER BY nom');
   const csv = stringifyUsersCsv(users);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="utilisateurs.csv"');

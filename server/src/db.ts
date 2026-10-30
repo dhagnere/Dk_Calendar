@@ -124,10 +124,10 @@ const LOT_INSERTION = 500;
  * Insère des objets (champs en camelCase) et renvoie les lignes créées. Un champ absent ou
  * `undefined` prend la valeur par défaut de la colonne, comme avec Mongoose.
  */
-export async function inserer<T = Ligne>(table: NomTable, objets: Ligne[], executant: Executant = pool): Promise<T[]> {
+export async function inserer<T = Ligne>(table: NomTable, objets: readonly object[], executant: Executant = pool): Promise<T[]> {
   const creees: T[] = [];
   for (let debut = 0; debut < objets.length; debut += LOT_INSERTION) {
-    const lot = objets.slice(debut, debut + LOT_INSERTION);
+    const lot = objets.slice(debut, debut + LOT_INSERTION) as Ligne[];
     const champs = [...new Set(lot.flatMap((o) => Object.keys(o).filter((c) => o[c] !== undefined)))];
     const params: unknown[] = [];
     const valeurs = lot.map(
@@ -151,7 +151,7 @@ export async function inserer<T = Ligne>(table: NomTable, objets: Ligne[], execu
 }
 
 /** Variante de `inserer` pour un seul objet. */
-export async function insererUn<T = Ligne>(table: NomTable, objet: Ligne, executant: Executant = pool): Promise<T> {
+export async function insererUn<T = Ligne>(table: NomTable, objet: object, executant: Executant = pool): Promise<T> {
   const [ligne] = await inserer<T>(table, [objet], executant);
   return ligne;
 }
