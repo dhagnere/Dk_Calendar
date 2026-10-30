@@ -24,14 +24,14 @@ Sommaire :
 ## 1. Vue d'ensemble
 
 L'application est une seule image Docker (frontend React buildé + API Express, servis ensemble)
-plus une base **MongoDB**. Tout est déjà décrit dans le `Dockerfile` du dépôt ; ce document ajoute
-un fichier `docker-compose.prod.yml` (Mongo + app, pensé pour un vrai serveur, contrairement à
+plus une base **PostgreSQL**. Tout est déjà décrit dans le `Dockerfile` du dépôt ; ce document ajoute
+un fichier `docker-compose.prod.yml` (PostgreSQL + app, pensé pour un vrai serveur, contrairement à
 `docker-compose.yml` qui ne sert qu'à un test local rapide) et détaille chaque étape.
 
 Le principe général :
 
 ```
-Dépôt Git (GitHub) ──clone/pull──▶ Serveur CUD ──docker compose build/up──▶ Conteneurs (app + mongo)
+Dépôt Git (GitHub) ──clone/pull──▶ Serveur CUD ──docker compose build/up──▶ Conteneurs (app + postgres)
                                                                                   │
                                                                           reverse proxy HTTPS
                                                                                   │
@@ -42,18 +42,20 @@ Dépôt Git (GitHub) ──clone/pull──▶ Serveur CUD ──docker compose 
 
 - Un serveur Linux (VM ou physique) avec **Docker** et **Docker Compose v2** installés
   (`docker compose version` doit fonctionner). C'est la seule dépendance système nécessaire : ni
-  Node.js, ni MongoDB à installer à la main, tout est dans les conteneurs.
+  Node.js, ni PostgreSQL à installer à la main, tout est dans les conteneurs.
 - Un nom de domaine (ou sous-domaine) pointant vers ce serveur, et la possibilité d'obtenir un
   certificat HTTPS (Let's Encrypt via le reverse proxy déjà en place à la CUD, ou `certbot`).
-- Un accès réseau sortant vers `github.com` (pour cloner/mettre à jour le dépôt) et, uniquement le
-  temps de la reprise des données (étape 6), vers la base actuelle (Atlas).
+- Un accès réseau sortant vers `github.com` (pour cloner/mettre à jour le dépôt). La reprise des
+  données (étape 6) passe par un simple fichier : aucun accès du serveur à l'ancienne base n'est
+  nécessaire.
 - Si le service HTTP/HTTPS de la CUD est mutualisé (reverse proxy central, pare-feu géré par une
   équipe infra dédiée), coordonnez avec elle pour l'étape 7 — ce document décrit la configuration
   côté application, pas la politique réseau interne de la CUD.
 
 > Si l'équipe infra de la CUD préfère un autre outil que Docker Compose (Kubernetes, Portainer,
 > leur propre CI/CD…), le même `Dockerfile` reste utilisable tel quel : il suffit de leur fournir
-> une base MongoDB joignable et les variables d'environnement de la section 4 — l'image ne suppose
+> une base PostgreSQL (13 ou plus) joignable et les variables d'environnement de la section 4 — le
+> schéma est créé par l'application elle-même au premier démarrage. L'image ne suppose
 > rien d'autre sur la façon dont elle est orchestrée.
 
 ## 3. Récupérer le code
@@ -75,7 +77,8 @@ git checkout main        # voir §11 : la branche suivie par la prod, distincte 
 cp .env.prod.example .env
 ```
 
-Éditez `.env` et renseignez au minimum `JWT_SECRET`, `CLIENT_ORIGIN` et `APP_URL` (voir le détail de
+Éditez `.env` et renseignez au minimum `POSTGRES_PASSWORD`, `JWT_SECRET`, `CLIENT_ORIGIN` et `APP_URL`
+(voir le détail de
 chaque variable en annexe, §13, et les commentaires dans `.env.prod.example`). Ce fichier `.env` (à
 la racine, pas dans `server/`) reste local au serveur, n'est jamais commité (`.gitignore`), et est
 lu automatiquement par `docker-compose.prod.yml`.
@@ -87,57 +90,47 @@ docker compose -f docker-compose.prod.yml up --build -d
 docker compose -f docker-compose.prod.yml logs -f app   # Ctrl+C pour sortir une fois "En écoute sur..." affiché
 ```
 
-À ce stade l'application tourne mais la base est vide (aucun événement, aucun compte) : passez à
-l'étape suivante avant d'y accéder.
+Au premier démarrage, l'application crée elle-même les tables (fichiers de `server/migrations/`,
+message « Migration appliquée » dans les logs). La base est alors vide (aucun événement, aucun
+compte) : passez à l'étape suivante avant d'y accéder.
 
 ## 6. Peupler la base de données
 
 Deux options, selon ce que vous voulez reprendre :
 
-### Option A (recommandée) — reprise intégrale des données réelles actuelles
+### Option A (recommandée) — reprise des données réelles actuelles
 
-Conserve tout : les ~14 700 événements avec leurs statuts/validations/géolocalisation actuels, les
-comptes existants, l'historique du journal d'audit, et les sauvegardes automatiques déjà
-constituées. C'est un dump/restore MongoDB classique depuis l'environnement de dev/démo actuel
-(Render + MongoDB Atlas) vers le Mongo du serveur CUD.
+Reprend les ~14 700 événements avec leurs statuts, validations et géolocalisation actuels, ainsi
+que les comptes existants (mêmes emails, mêmes mots de passe). La reprise passe par le fichier
+d'export d'une sauvegarde de l'application actuelle (encore sous MongoDB) : aucun outil MongoDB à
+installer, aucun accès réseau entre l'ancienne base et le serveur CUD.
 
-1. Sur une machine ayant accès réseau à la base actuelle (Atlas), installez les
-   [MongoDB Database Tools](https://www.mongodb.com/try/download/database-tools) (`mongodump` /
-   `mongorestore`) — pas besoin d'installer MongoDB en entier, juste ces deux outils.
-2. Récupérez l'URI de connexion Atlas actuelle (celle utilisée par `MONGODB_URI` sur l'hébergeur
-   actuel), puis faites le dump :
+1. Dans l'application actuelle, connecté en administrateur, onglet **Sauvegardes** : cliquez sur
+   le bouton de sauvegarde manuelle, puis sur **Exporter** pour la sauvegarde qui vient d'être
+   créée. Un fichier `sauvegarde-<identifiant>.json` est téléchargé.
+2. Transférez ce fichier vers le serveur CUD (`scp`, ou tout autre moyen sécurisé habituel de la
+   CUD). Il contient les empreintes des mots de passe : supprimez-le une fois la reprise terminée.
+3. Sur le serveur CUD, copiez-le dans le conteneur et lancez la reprise :
    ```bash
-   mongodump --uri="mongodb+srv://<utilisateur>:<mot-de-passe>@<cluster>.mongodb.net/dk_calendar" \
-     --archive=dk_calendar.dump --gzip
+   docker compose -f docker-compose.prod.yml cp sauvegarde-<identifiant>.json app:/tmp/sauvegarde.json
+   docker compose -f docker-compose.prod.yml exec app node dist/reprise-sauvegarde.js /tmp/sauvegarde.json
    ```
-3. Transférez le fichier `dk_calendar.dump` obtenu vers le serveur CUD (`scp`, ou tout autre moyen
-   sécurisé habituel de la CUD).
-4. Sur le serveur CUD, exposez temporairement Mongo en local uniquement (jamais publiquement) pour
-   pouvoir s'y connecter avec `mongorestore` : ajoutez `ports: ["127.0.0.1:27017:27017"]` au service
-   `mongo` de `docker-compose.prod.yml` (voir le commentaire déjà présent dans ce fichier), puis :
-   ```bash
-   docker compose -f docker-compose.prod.yml up -d mongo
-   mongorestore --uri="mongodb://127.0.0.1:27017/dk_calendar" --archive=dk_calendar.dump --gzip --drop
-   ```
-   `--drop` supprime les collections existantes avant restauration (sans risque ici puisque la base
-   du serveur CUD vient d'être créée et est vide).
-5. **Retirez la ligne `ports:` ajoutée à l'étape précédente** dans `docker-compose.prod.yml` (remise
-   à l'état d'origine, sans port publié), puis relancez :
-   ```bash
-   docker compose -f docker-compose.prod.yml up -d
-   ```
-6. Les comptes existants sont repris tels quels (mêmes emails, mêmes mots de passe déjà définis) —
-   rien de plus à faire côté comptes.
+   Le script affiche le nombre d'événements et de comptes chargés. Il refuse d'écrire dans une base
+   qui contient déjà des données ; pour recommencer, ajoutez `--remplacer` à la fin de la commande.
+4. Les comptes sont repris tels quels : rien de plus à faire de ce côté.
+
+Ne sont pas repris : le journal d'audit, les demandes d'accès en attente et l'historique des
+sauvegardes, qui repartent à vide sur le serveur CUD. Conservez le fichier d'export de l'étape 1
+en lieu sûr si l'historique doit pouvoir être consulté plus tard.
 
 ### Option B — reconstruction propre depuis les CSV
 
-Plus simple, mais ne reprend **que** les événements et les comptes (pas le journal d'audit ni les
-sauvegardes historiques) : à réserver à un environnement neuf sans historique à conserver, ou en
+Ne reprend que les événements, sans les comptes réels : à réserver à un environnement neuf, ou en
 secours si l'option A n'est pas possible.
 
 `data/evenements.csv`, dans le dépôt, est tenu à jour automatiquement (synchronisation GitHub après
 chaque import — voir §11) : il reflète donc déjà l'état réel actuel des événements, sans besoin
-d'accès à Atlas. En revanche `data/utilisateurs.csv` ne contient que des **comptes d'exemple** —
+d'accès à l'ancienne base. En revanche `data/utilisateurs.csv` ne contient que des **comptes d'exemple** —
 ne jamais les utiliser tels quels en production réelle.
 
 ```bash
@@ -172,7 +165,7 @@ Quel que soit le reverse proxy utilisé, vérifiez que `CLIENT_ORIGIN` et `APP_U
 - **Calendrier** et **Liste** affichent bien les événements repris à l'étape 6
 - **Carte** : les événements déjà géolocalisés affichent leurs marqueurs (le géocodage ne se
   relance pas tout seul, il faudra le déclencher pour tout nouvel événement sans lieu connu)
-- **Journal** : si l'option A a été utilisée, l'historique antérieur apparaît bien
+- **Comptes** : si l'option A a été utilisée, les comptes existants apparaissent bien
 - Un import CSV de test (option Consultant → Administrateur) se déroule sans erreur
 - La sauvegarde automatique quotidienne se déclenche (visible dans l'onglet **Sauvegardes** après
   24h, ou immédiatement via le bouton de sauvegarde manuelle)
@@ -185,19 +178,35 @@ Deux mécanismes complémentaires, à garder tous les deux :
   automatiquement chaque jour, et avant chaque import/fusion/restauration, consultable et
   téléchargeable depuis l'onglet **Sauvegardes** (30 dernières conservées). Bonne pour un rollback
   rapide depuis l'interface, mais ne couvre pas le journal d'audit ni les demandes d'accès.
-- **Infrastructure** (à mettre en place côté CUD, hors périmètre applicatif) : un `mongodump`
-  périodique (cron) du volume `mongo_data`, exporté hors du serveur — c'est la seule protection
-  contre la perte du serveur lui-même (disque défaillant, suppression accidentelle du volume…). Ce
-  sont exactement les mêmes commandes qu'à l'étape 6 (`mongodump --uri="mongodb://127.0.0.1:27017/dk_calendar" ...`),
-  à automatiser et stocker ailleurs que sur ce même serveur.
+- **Infrastructure** (à mettre en place côté CUD, hors périmètre applicatif) : un `pg_dump`
+  périodique (cron) de la base, exporté hors du serveur — c'est la seule protection contre la perte
+  du serveur lui-même (disque défaillant, suppression accidentelle du volume `pg_data`…). Le dump se
+  fait depuis le conteneur, sans publier de port :
+  ```bash
+  cd /chemin/vers/Dk_Calendar
+  docker compose -f docker-compose.prod.yml exec -T postgres \
+    pg_dump -U dk_calendar -Fc dk_calendar > dk_calendar-$(date +%F).dump
+  ```
+  Et pour restaurer un dump (base remise à l'état du fichier, application arrêtée le temps de
+  l'opération) :
+  ```bash
+  docker compose -f docker-compose.prod.yml stop app
+  docker compose -f docker-compose.prod.yml exec -T postgres \
+    pg_restore -U dk_calendar -d dk_calendar --clean --if-exists < dk_calendar-AAAA-MM-JJ.dump
+  docker compose -f docker-compose.prod.yml start app
+  ```
+  Contrairement aux sauvegardes applicatives, ce dump couvre toute la base (journal d'audit et
+  demandes d'accès compris).
 
 ## 10. Sécurité — à valider avant l'ouverture réelle
 
 - `JWT_SECRET` : une vraie valeur aléatoire propre à cet environnement (jamais celle d'un
   `.env.example`, jamais réutilisée d'un autre environnement)
-- Le port Mongo (27017) n'est **jamais** publié sur une interface publique — voir la note dans
-  `docker-compose.prod.yml` (uniquement `127.0.0.1:27017` le temps ponctuel d'un dump/restore,
-  jamais `27017:27017` seul)
+- `POSTGRES_PASSWORD` : une vraie valeur aléatoire, conservée hors du serveur (coffre-fort de
+  mots de passe de la DSI)
+- Le port PostgreSQL (5432) n'est **jamais** publié sur une interface publique — voir la note dans
+  `docker-compose.prod.yml` (uniquement `127.0.0.1:5432` le temps d'une intervention ponctuelle,
+  jamais `5432:5432` seul ; les dumps du §9 n'en ont pas besoin)
 - SMTP configuré avec de vraies informations d'envoi (sinon les emails de notification restent
   seulement dans les logs du conteneur — acceptable pour une recette interne, pas pour une ouverture
   à de vrais utilisateurs externes)
@@ -216,7 +225,7 @@ environnements distincts, avec un rôle clair pour chacun :
 
 | | Environnement de développement (actuel) | Production CUD |
 |---|---|---|
-| Où | Hébergeur actuel (Render) + MongoDB Atlas gratuit | Serveurs de la CUD (ce document) |
+| Où | Hébergeur de dev + base PostgreSQL de dev | Serveurs de la CUD (ce document) |
 | Données | Import de test, ou copie ponctuelle | Vraies données, vrais utilisateurs |
 | Branche Git | branche de dev / branches de fonctionnalité | `main` (ou `production`) |
 | Mise à jour | à chaque commit (déploiement continu de l'hébergeur actuel) | seulement quand décidé (§12) |
@@ -258,8 +267,12 @@ docker compose -f docker-compose.prod.yml up -d app
 docker compose -f docker-compose.prod.yml logs -f app   # vérifie le redémarrage
 ```
 
-- Mongo n'est pas touché (`up -d app` ne redémarre que le service applicatif) : aucune donnée
+- PostgreSQL n'est pas touché (`up -d app` ne redémarre que le service applicatif) : aucune donnée
   n'est perdue lors d'une mise à jour.
+- Si la nouvelle version modifie la structure de la base (nouveau fichier dans `server/migrations/`),
+  l'application l'applique d'elle-même au redémarrage (message « Migration appliquée » dans les
+  logs). Faites un `pg_dump` (§9) juste avant une telle mise à jour : un retour en arrière du code
+  ne défait pas une migration déjà appliquée.
 - Pas besoin de relancer le seed (§6) à chaque mise à jour — il ne sert qu'à l'installation
   initiale, ou à une reconstruction volontaire.
 - Interruption de service : quelques secondes (le temps du redémarrage du conteneur `app`), sans
@@ -285,7 +298,8 @@ précédente attendait un format de données différent.
 
 | Variable | Obligatoire | Rôle |
 |---|---|---|
-| `MONGODB_URI` | Oui (déjà fixée dans `docker-compose.prod.yml`) | Connexion MongoDB |
+| `POSTGRES_PASSWORD` | Oui | Mot de passe du compte PostgreSQL `dk_calendar` (lu à la création du volume) |
+| `DATABASE_URL` | Oui (déjà construite dans `docker-compose.prod.yml`) | Connexion PostgreSQL |
 | `JWT_SECRET` | Oui | Signature des sessions — valeur aléatoire propre à cet environnement |
 | `PORT` | Oui (déjà fixée dans `docker-compose.prod.yml`) | Port d'écoute interne du conteneur |
 | `CLIENT_ORIGIN` | Oui | URL publique HTTPS (CORS + cookies de session) |

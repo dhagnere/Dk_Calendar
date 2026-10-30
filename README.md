@@ -3,7 +3,7 @@
 Reconstruction en application web **autonome** (indépendante de monday.com) de l'app d'origine, à partir de l'export
 `reference-vibe-export/` (qui reste dans le dépôt comme référence historique).
 
-- **Backend** : Node.js + Express + TypeScript, base de données **MongoDB** (Mongoose)
+- **Backend** : Node.js + Express + TypeScript, base de données **PostgreSQL** (pilote `pg`, SQL écrit à la main)
 - **Frontend** : React + Vite + TypeScript + Ant Design
 - **Auth** : comptes Administrateur / Consultant, mot de passe haché (PBKDF2 + sel), session via cookie JWT
 - **Données** : deux fichiers CSV (`data/evenements.csv`, `data/utilisateurs.csv`) servent de **base d'import/seed** —
@@ -43,36 +43,44 @@ Volontairement laissé de côté pour l'instant :
 ```
 data/                    CSV de base (source d'import/seed) pour événements et utilisateurs
 docs/                    Documentation complémentaire (déploiement CUD, etc.)
-server/                  API Express + MongoDB (Mongoose)
+server/                  API Express + PostgreSQL (schéma dans server/migrations/)
 client/                  Frontend React (Vite)
 reference-vibe-export/   Ancien export monday Vibe, conservé comme référence fonctionnelle
 Dockerfile               Image de production (build client + serveur en une seule image)
-docker-compose.yml       Mongo + app pour un test local "à la prod" (dev uniquement)
-docker-compose.prod.yml  Mongo + app pour un vrai serveur (voir docs/DEPLOIEMENT-CUD.md)
+docker-compose.yml       PostgreSQL + app pour un test local "à la prod" (dev uniquement)
+docker-compose.prod.yml  PostgreSQL + app pour un vrai serveur (voir docs/DEPLOIEMENT-CUD.md)
 .env.prod.example        Modèle de configuration pour docker-compose.prod.yml
 ```
 
 ## Installation locale
 
-Prérequis : Node.js ≥ 20, et soit MongoDB local (via Docker), soit un cluster MongoDB Atlas gratuit.
+Prérequis : Node.js ≥ 20 et PostgreSQL ≥ 13 (local via Docker, installé sur le poste, ou base hébergée).
 
 ```bash
 npm install                       # installe client + serveur (workspaces npm)
 cp server/.env.example server/.env
 ```
 
-### Option A — MongoDB local via Docker
+### Option A — PostgreSQL local via Docker
 
 ```bash
-docker run -d --name mongo-dk -p 27017:27017 mongo:7
+docker compose up -d postgres
 ```
 
-`MONGODB_URI` par défaut dans `.env` (`mongodb://127.0.0.1:27017/dk_calendar`) fonctionne tel quel.
+La valeur de `DATABASE_URL` fournie dans `.env.example`
+(`postgres://dk_calendar:dk_calendar@127.0.0.1:5432/dk_calendar`) fonctionne telle quelle.
 
-### Option B — MongoDB Atlas (gratuit)
+### Option B — PostgreSQL déjà installé ou hébergé
 
-1. Créez un cluster gratuit **M0** sur https://www.mongodb.com/cloud/atlas/register
-2. Récupérez l'URI de connexion (`mongodb+srv://...`) et collez-la dans `server/.env` → `MONGODB_URI`
+Créez une base et un compte dédiés, puis renseignez `DATABASE_URL` dans `server/.env`
+(`postgres://utilisateur:motdepasse@hote:5432/base`, avec `?sslmode=require` à la fin si l'hébergeur impose TLS).
+
+### Schéma de la base
+
+Inutile de créer les tables à la main : au démarrage, le serveur (comme `npm run seed`) applique les fichiers de
+`server/migrations/` qui ne l'ont pas encore été, dans l'ordre, et le note dans la table `migrations_schema`. Pour
+faire évoluer le schéma, ajoutez un nouveau fichier numéroté (`002_….sql`) ; ne modifiez jamais un fichier déjà
+appliqué en production.
 
 ### Peupler la base depuis les CSV
 
@@ -80,7 +88,7 @@ docker run -d --name mongo-dk -p 27017:27017 mongo:7
 npm run seed
 ```
 
-Relit `data/evenements.csv` et `data/utilisateurs.csv` et fait un *upsert* dans MongoDB. Les mots de passe
+Relit `data/evenements.csv` et `data/utilisateurs.csv` et fait un *upsert* dans PostgreSQL. Les mots de passe
 temporaires générés (si non fournis dans le CSV) sont affichés dans la console — notez-les.
 
 ⚠️ Le CSV `data/utilisateurs.csv` fourni contient des **comptes d'exemple** (`admin@dunkerque.example` /
@@ -127,7 +135,20 @@ npm start          # sert le client buildé + l'API sur http://localhost:4000
 docker compose up --build
 ```
 
-Démarre un MongoDB local + l'application buildée sur http://localhost:4000.
+Démarre un PostgreSQL local + l'application buildée sur http://localhost:4000.
+
+### Reprendre les données d'une ancienne installation MongoDB
+
+Dans l'ancienne application, page **Sauvegardes** : créez une sauvegarde manuelle puis cliquez sur **Exporter**.
+Chargez ensuite ce fichier JSON dans la nouvelle base :
+
+```bash
+npm run reprise -w server -- chemin/vers/sauvegarde.json
+```
+
+Événements et comptes sont repris avec leurs identifiants d'origine (mots de passe compris). Le script refuse
+d'écrire dans une base qui contient déjà des données, sauf avec `--remplacer`. Le journal d'audit et les demandes
+d'accès ne font pas partie des sauvegardes et repartent donc à vide.
 
 ## Déploiement — environnement de dev/démo (le moins cher)
 
@@ -135,7 +156,8 @@ Cette section décrit l'hébergement actuel de l'environnement de **développeme
 nouvelle fonctionnalité avant de la proposer en production). Pour le **déploiement en production sur les serveurs de
 la CUD**, avec reprise des données réelles actuelles, voir [`docs/DEPLOIEMENT-CUD.md`](docs/DEPLOIEMENT-CUD.md).
 
-**Base de données : MongoDB Atlas, palier gratuit M0 (0 €, 512 Mo)** — largement suffisant pour ce volume de données.
+**Base de données : une offre PostgreSQL managée** (par exemple la base PostgreSQL gratuite de Render, Neon ou
+Supabase), largement suffisante pour ce volume de données.
 
 **Hébergement de l'application (choisir un seul, tous compatibles avec le `Dockerfile` fourni) :**
 
@@ -148,9 +170,9 @@ la CUD**, avec reprise des données réelles actuelles, voir [`docs/DEPLOIEMENT-
 
 Étapes générales, quel que soit l'hébergeur :
 
-1. Créez le cluster Atlas gratuit et récupérez son URI de connexion
+1. Créez la base PostgreSQL et récupérez son URL de connexion
 2. Configurez les variables d'environnement sur l'hébergeur :
-   - `MONGODB_URI` = URI Atlas
+   - `DATABASE_URL` = URL de connexion PostgreSQL (le plus souvent avec `?sslmode=require`)
    - `JWT_SECRET` = valeur aléatoire (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
    - `CLIENT_ORIGIN` et `APP_URL` = l'URL publique de l'app (le frontend est servi par le même serveur, donc identiques)
    - `PORT` = celui imposé par l'hébergeur (souvent injecté automatiquement)
@@ -158,7 +180,7 @@ la CUD**, avec reprise des données réelles actuelles, voir [`docs/DEPLOIEMENT-
    - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `EMAIL_FROM` = voir section Emails ci-dessus (sans
      ces variables, les emails sont juste loggés, l'app fonctionne quand même)
 3. Déployez l'image construite par le `Dockerfile` (la plupart des hébergeurs ci-dessus le détectent automatiquement)
-4. Lancez `npm run seed` une fois (en local, pointé vers l'URI Atlas de prod, ou via un job ponctuel sur l'hébergeur) pour peupler la base, ou créez le compte administrateur directement depuis l'écran de connexion
+4. Lancez `npm run seed` une fois (en local, pointé vers l'URL de la base de prod, ou via un job ponctuel sur l'hébergeur) pour peupler la base, ou créez le compte administrateur directement depuis l'écran de connexion
 
 ## Sécurité — points à connaître avant une mise en production réelle
 
@@ -171,5 +193,5 @@ la CUD**, avec reprise des données réelles actuelles, voir [`docs/DEPLOIEMENT-
 - `data/utilisateurs.csv` ne doit **jamais** contenir de vrais mots de passe en clair une fois committé dans un
   dépôt partagé — utilisez-le uniquement comme modèle, ou gardez la version réelle hors du contrôle de version
 
-Pour la checklist sécurité spécifique au déploiement en production sur les serveurs de la CUD (Mongo non exposé,
+Pour la checklist sécurité spécifique au déploiement en production sur les serveurs de la CUD (PostgreSQL non exposé,
 `GITHUB_TOKEN` à laisser vide, etc.), voir [`docs/DEPLOIEMENT-CUD.md` §10](docs/DEPLOIEMENT-CUD.md#10-sécurité--à-valider-avant-louverture-réelle).
