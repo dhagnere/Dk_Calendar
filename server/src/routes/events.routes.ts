@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { EventModel } from '../models/Event.js';
+import { executer, inserer, requete, requeteUne, transaction, type Executant } from '../db.js';
+import type { Evenement } from '../modeles.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { LIMITES_CUD, geocoderPlusieursAdresses } from '../lib/geocodage.js';
 import { motifRechercheInsensibleAccents } from '../lib/rechercheAccents.js';
@@ -19,7 +20,10 @@ const LOT_GEOCODAGE = 10;
 const ANNEE_PLANCHER_PAR_DEFAUT = 2024;
 
 /** Date de référence pour savoir si un événement est terminé : dateDeFin, sinon dateDeDebut, sinon dateClef. */
-const DATE_FIN_EFFECTIVE = { $ifNull: ['$dateDeFin', { $ifNull: ['$dateDeDebut', '$dateClef'] }] };
+const DATE_FIN_EFFECTIVE = 'COALESCE(date_de_fin, date_de_debut, date_clef)';
+
+/** Date de référence d'un événement pour le tri et le comptage par année : dateDeDebut, sinon dateClef. */
+const DATE_REFERENCE = 'COALESCE(date_de_debut, date_clef)';
 
 /**
  * Liste des événements, avec filtres optionnels (quartier, statut, nature, type, recherche).
@@ -35,10 +39,10 @@ const DATE_FIN_EFFECTIVE = { $ifNull: ['$dateDeFin', { $ifNull: ['$dateDeDebut',
  * masqués ; passer `avecEvenementsArchives=true` les inclut à nouveau (déclencheur côté client).
  */
 eventsRouter.get('/', async (req, res) => {
-  // Chaque valeur passe par queryString() : sans ça, une requête façonnée comme
-  // ?quartier[$ne]= (que le parseur de requête d'Express transforme en objet) pourrait être
-  // affectée telle quelle à un filtre MongoDB et injecter un opérateur ($ne, $regex…) au lieu
-  // d'une simple comparaison d'égalité — cette route est publique, sans authentification.
+  // Chaque valeur passe par queryString() : le parseur de requête d'Express transforme
+  // ?quartier[x]= ou ?quartier=a&quartier=b en objet ou en tableau, alors qu'on attend un texte
+  // simple — cette route est publique, sans authentification. Les valeurs ne sont ensuite jamais
+  // concaténées au SQL : elles passent toutes en paramètres ($1, $2…).
   const quartier = queryString(req.query.quartier);
   const statut = queryString(req.query.statut);
   const nature = queryString(req.query.nature);
@@ -50,72 +54,79 @@ eventsRouter.get('/', async (req, res) => {
   const maintenant = new Date();
 
   // Valide et archive automatiquement tout événement dont la date de fin est déjà passée.
-  await EventModel.updateMany(
-    {
-      $expr: { $and: [{ $ne: [DATE_FIN_EFFECTIVE, null] }, { $lt: [DATE_FIN_EFFECTIVE, maintenant] }] },
-      $or: [{ validationTechnique: false }, { validationPolitique: false }],
-    },
-    { statut: 'Validée', validationTechnique: true, validationPolitique: true }
+  await executer(
+    `UPDATE evenements SET statut = 'Validée', validation_technique = true, validation_politique = true
+      WHERE ${DATE_FIN_EFFECTIVE} < $1 AND (NOT validation_technique OR NOT validation_politique)`,
+    [maintenant]
   );
 
-  const filter: Record<string, unknown> = {};
-  if (quartier && quartier !== 'ALL') filter.quartier = quartier;
-  if (nature && nature !== 'ALL') filter.nature = nature;
-  if (type && type !== 'ALL') filter.type = type;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  const parametre = (valeur: unknown) => {
+    params.push(valeur);
+    return `$${params.length}`;
+  };
+
+  if (quartier && quartier !== 'ALL') conditions.push(`quartier = ${parametre(quartier)}`);
+  if (nature && nature !== 'ALL') conditions.push(`nature = ${parametre(nature)}`);
+  if (type && type !== 'ALL') conditions.push(`type = ${parametre(type)}`);
   if (searchTerm && searchTerm.trim().length > 0) {
     // Insensible à la casse ET aux accents (« evenement » retrouve aussi bien « Événement »).
-    filter.nom = { $regex: motifRechercheInsensibleAccents(searchTerm.trim()), $options: 'i' };
+    conditions.push(`nom ~* ${parametre(motifRechercheInsensibleAccents(searchTerm.trim()))}`);
   }
 
   if (statut === 'Validée') {
-    filter.validationTechnique = true;
-    filter.validationPolitique = true;
+    conditions.push('validation_technique AND validation_politique');
   } else if (statut && statut !== 'ALL') {
-    filter.statut = statut;
+    conditions.push(`statut = ${parametre(statut)}`);
   }
 
   const anneeActuelle = maintenant.getFullYear();
   const finPeriode = new Date(anneeActuelle + 2, 0, 1); // borne haute exclusive : fin de l'année en cours + 1 an
-  const contraintesDate: Record<string, unknown> = { $lt: finPeriode };
+  const bornesDate = [`${DATE_REFERENCE} < ${parametre(finPeriode)}`];
   if (avecEvenementsPasses !== 'true') {
-    contraintesDate.$gte = new Date(ANNEE_PLANCHER_PAR_DEFAUT, 0, 1);
+    bornesDate.push(`${DATE_REFERENCE} >= ${parametre(new Date(ANNEE_PLANCHER_PAR_DEFAUT, 0, 1))}`);
+  }
+  conditions.push(`(${DATE_REFERENCE} IS NULL OR (${bornesDate.join(' AND ')}))`);
+
+  if (avecEvenementsArchives !== 'true') {
+    conditions.push(`(${DATE_FIN_EFFECTIVE} IS NULL OR ${DATE_FIN_EFFECTIVE} >= ${parametre(maintenant)})`);
   }
 
   // Trie par proximité avec aujourd'hui décroissante : l'événement dont la dateDeDebut (ou dateClef
   // en repli) est la plus proche de la date du jour arrive en premier, puis on s'éloigne
   // progressivement (dans le passé comme dans le futur) vers l'événement le plus lointain. Les
   // événements sans aucune date sont placés en dernier.
-  const items = await EventModel.aggregate([
-    { $match: filter },
-    { $addFields: { dateTri: { $ifNull: ['$dateDeDebut', '$dateClef'] }, dateFin: DATE_FIN_EFFECTIVE } },
-    { $match: { $or: [{ dateTri: null }, { dateTri: contraintesDate }] } },
-    ...(avecEvenementsArchives === 'true'
-      ? []
-      : [{ $match: { $or: [{ dateFin: null }, { dateFin: { $gte: maintenant } }] } }]),
-    { $addFields: { dateTriAbsente: { $cond: [{ $eq: ['$dateTri', null] }, 1, 0] } } },
-    {
-      $addFields: {
-        proximite: { $cond: [{ $eq: ['$dateTri', null] }, null, { $abs: { $subtract: ['$dateTri', maintenant] } }] },
-      },
-    },
-    { $sort: { dateTriAbsente: 1, proximite: 1, nom: 1 } },
-  ]);
+  const items = await requete<Evenement>(
+    `SELECT * FROM evenements
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY ${DATE_REFERENCE} IS NULL,
+               abs(extract(epoch FROM ${DATE_REFERENCE} - ${parametre(maintenant)})),
+               nom`,
+    params
+  );
   res.json({ items });
 });
+
+/**
+ * Nombre d'événements par valeur d'une colonne (valeurs vides écartées). `colonne` vient toujours du
+ * code, jamais de la requête HTTP : elle peut donc être insérée telle quelle dans le SQL.
+ */
+function compterPar(colonne: 'quartier' | 'nature' | 'statut' | 'type'): Promise<{ label: string; count: number }[]> {
+  return requete(
+    `SELECT ${colonne} AS label, count(*) AS count FROM evenements WHERE ${colonne} <> '' GROUP BY ${colonne}`
+  );
+}
 
 /** Options disponibles pour les filtres (quartiers/natures/statuts/types avec comptage). */
 eventsRouter.get('/options-filtres', async (_req, res) => {
   const [quartiers, natures, statuts, types] = await Promise.all([
-    EventModel.aggregate([{ $group: { _id: '$quartier', count: { $sum: 1 } } }]),
-    EventModel.aggregate([{ $group: { _id: '$nature', count: { $sum: 1 } } }]),
-    EventModel.aggregate([{ $group: { _id: '$statut', count: { $sum: 1 } } }]),
-    EventModel.aggregate([{ $group: { _id: '$type', count: { $sum: 1 } } }]),
+    compterPar('quartier'),
+    compterPar('nature'),
+    compterPar('statut'),
+    compterPar('type'),
   ]);
-
-  const format = (rows: { _id: string; count: number }[]) =>
-    rows.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count }));
-
-  res.json({ quartiers: format(quartiers), natures: format(natures), statuts: format(statuts), types: format(types) });
+  res.json({ quartiers, natures, statuts, types });
 });
 
 /** Valeurs de référence (listes fermées) pour les champs à choix de la Fiche de renseignement. */
@@ -194,7 +205,7 @@ eventsRouter.post('/', requireAuth, async (req, res) => {
 
   // Empêche de créer un doublon d'un événement déjà en base le(s) même(s) jour(s) — même logique
   // d'identité que l'import CSV et la détection de doublons (nom normalisé + lieu + jour).
-  const existants = await EventModel.find({}, { eventId: 1, nom: 1, lieu: 1, dateClef: 1, dateDeDebut: 1 }).lean();
+  const existants = await requete<Evenement>('SELECT event_id, nom, lieu, date_clef, date_de_debut FROM evenements');
   const clesExistantes = new Set(existants.map(cleIdentite));
   const doublon = nouvellesLignes.some((ligne) => clesExistantes.has(cleIdentite(ligne as Parameters<typeof cleIdentite>[0])));
   if (doublon) {
@@ -202,7 +213,7 @@ eventsRouter.post('/', requireAuth, async (req, res) => {
     return;
   }
 
-  const crees = await EventModel.insertMany(nouvellesLignes);
+  const crees = await inserer<Evenement>('evenements', nouvellesLignes);
   await consigner(identiteDeRequete(req), 'creation_evenement', gabarit.nom, {
     dateDeDebut: nouveauDebut,
     dateDeFin: memeJour ? null : nouveauFin,
@@ -217,8 +228,8 @@ eventsRouter.post('/', requireAuth, async (req, res) => {
  * plus. Réservé aux administrateurs, qui décident lesquelles conserver.
  */
 eventsRouter.get('/doublons', requireAdmin, async (_req, res) => {
-  const evenements = await EventModel.find({}).sort({ nom: 1 }).lean();
-  const groupes = new Map<string, typeof evenements>();
+  const evenements = await requete<Evenement>('SELECT * FROM evenements ORDER BY nom');
+  const groupes = new Map<string, Evenement[]>();
   for (const e of evenements) {
     const cle = cleIdentite(e);
     const liste = groupes.get(cle);
@@ -243,7 +254,7 @@ eventsRouter.post('/doublons/fusionner', requireAdmin, async (req, res) => {
   }
 
   await creerSauvegarde('avant-fusion-doublons');
-  await EventModel.deleteMany({ _id: { $in: parsed.data.idsASupprimer } });
+  await executer('DELETE FROM evenements WHERE id = ANY($1)', [parsed.data.idsASupprimer]);
   await consigner(identiteDeRequete(req), 'fusion_doublons', `${parsed.data.idsASupprimer.length} exemplaire(s) supprimé(s)`, {
     idsASupprimer: parsed.data.idsASupprimer,
   });
@@ -255,22 +266,21 @@ const ANNEE_PLANCHER_TOTAL_KPI = 2015;
 
 /** Statistiques KPI (total depuis 2015, validés, en attente, année en cours). */
 eventsRouter.get('/stats', async (_req, res) => {
-  // Date de référence d'un événement pour le comptage par année : dateDeDebut si présente, sinon dateClef.
-  const dateReference = { $ifNull: ['$dateDeDebut', '$dateClef'] };
   const anneeActuelle = new Date().getFullYear();
   const debutAnneeActuelle = new Date(anneeActuelle, 0, 1);
   const debutAnneeSuivante = new Date(anneeActuelle + 1, 0, 1);
   const debutPlancherTotal = new Date(ANNEE_PLANCHER_TOTAL_KPI, 0, 1);
-  const depuis2015: Record<string, unknown> = { $expr: { $gte: [dateReference, debutPlancherTotal] } };
 
-  const [total, validated, byStatut, byNature, anneeEnCours] = await Promise.all([
-    EventModel.countDocuments(depuis2015),
-    EventModel.countDocuments({ ...depuis2015, validationTechnique: true, validationPolitique: true }),
-    EventModel.aggregate([{ $group: { _id: '$statut', count: { $sum: 1 } } }]),
-    EventModel.aggregate([{ $group: { _id: '$nature', count: { $sum: 1 } } }]),
-    EventModel.countDocuments({
-      $expr: { $and: [{ $gte: [dateReference, debutAnneeActuelle] }, { $lt: [dateReference, debutAnneeSuivante] }] },
-    }),
+  const [[{ total, validated, anneeEnCours }], byStatut, byNature] = await Promise.all([
+    requete<{ total: number; validated: number; anneeEnCours: number }>(
+      `SELECT count(*) FILTER (WHERE ${DATE_REFERENCE} >= $1) AS total,
+              count(*) FILTER (WHERE ${DATE_REFERENCE} >= $1 AND validation_technique AND validation_politique) AS validated,
+              count(*) FILTER (WHERE ${DATE_REFERENCE} >= $2 AND ${DATE_REFERENCE} < $3) AS annee_en_cours
+         FROM evenements`,
+      [debutPlancherTotal, debutAnneeActuelle, debutAnneeSuivante]
+    ),
+    compterPar('statut'),
+    compterPar('nature'),
   ]);
 
   res.json({
@@ -280,19 +290,13 @@ eventsRouter.get('/stats', async (_req, res) => {
     anneeActuelle,
     anneeEnCours,
     anneePlancherTotal: ANNEE_PLANCHER_TOTAL_KPI,
-    byStatut: byStatut.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
-    byNature: byNature.filter((r) => r._id).map((r) => ({ label: r._id, count: r.count })),
+    byStatut,
+    byNature,
   });
 });
 
-/**
- * Filtre correspondant à « pas encore géocodé ». Attention : ajouter un champ avec une valeur par
- * défaut au schéma ne l'ajoute PAS rétroactivement aux documents déjà en base — un événement créé
- * avant ce champ n'a donc pas statutGeocodage: 'attente' mais littéralement AUCUN champ
- * statutGeocodage. `{ statutGeocodage: 'attente' }` ne les trouverait donc jamais : il faut aussi
- * accepter le champ absent, d'où $nin plutôt qu'une égalité stricte sur 'attente'.
- */
-const NON_GEOCODE = { statutGeocodage: { $nin: ['ok', 'echec'] } };
+/** Condition SQL correspondant à « pas encore géocodé » (ni réussi, ni abandonné). */
+const NON_GEOCODE = "statut_geocodage NOT IN ('ok', 'echec')";
 
 /**
  * Géocode un lot d'événements en attente, pour la page Carte. La recherche est bornée au territoire
@@ -309,27 +313,21 @@ eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
   try {
     // Événements déjà géocodés lors d'exécutions précédentes (avant la contrainte géographique
     // ci-dessus) dont les coordonnées tombent hors de la CUD : à reprendre avec la recherche bornée.
-    const remis = await EventModel.updateMany(
-      {
-        statutGeocodage: 'ok',
-        $or: [
-          { latitude: { $lt: LIMITES_CUD.latMin } },
-          { latitude: { $gt: LIMITES_CUD.latMax } },
-          { longitude: { $lt: LIMITES_CUD.lonMin } },
-          { longitude: { $gt: LIMITES_CUD.lonMax } },
-        ],
-      },
-      { statutGeocodage: 'attente', latitude: null, longitude: null }
+    const remis = await executer(
+      `UPDATE evenements SET statut_geocodage = 'attente', latitude = NULL, longitude = NULL
+        WHERE statut_geocodage = 'ok'
+          AND (latitude < $1 OR latitude > $2 OR longitude < $3 OR longitude > $4)`,
+      [LIMITES_CUD.latMin, LIMITES_CUD.latMax, LIMITES_CUD.lonMin, LIMITES_CUD.lonMax]
     );
-    if (remis.modifiedCount > 0) {
-      console.log(`[geocodage] ${remis.modifiedCount} événement(s) hors de la CUD remis en attente pour re-géocodage`);
+    if (remis > 0) {
+      console.log(`[geocodage] ${remis} événement(s) hors de la CUD remis en attente pour re-géocodage`);
     }
 
     // Un événement sans lieu du tout ne pourra jamais être géocodé : on l'écarte tout de suite.
-    await EventModel.updateMany({ ...NON_GEOCODE, $or: [{ lieu: null }, { lieu: '' }] }, { statutGeocodage: 'echec' });
+    await executer(`UPDATE evenements SET statut_geocodage = 'echec' WHERE ${NON_GEOCODE} AND btrim(lieu) = ''`);
 
-    const enAttente = await EventModel.find(NON_GEOCODE, { lieu: 1 }).lean();
-    const toutesAdressesDistinctes = [...new Set(enAttente.map((e) => e.lieu.trim()))];
+    const enAttente = await requete<{ lieu: string }>(`SELECT DISTINCT btrim(lieu) AS lieu FROM evenements WHERE ${NON_GEOCODE}`);
+    const toutesAdressesDistinctes = enAttente.map((e) => e.lieu);
     const adressesDistinctes = toutesAdressesDistinctes.slice(0, LOT_GEOCODAGE);
 
     let geocodes = 0;
@@ -339,19 +337,20 @@ eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
       const resultats = await geocoderPlusieursAdresses(adressesDistinctes);
       for (const [adresse, coords] of resultats) {
         if (coords) {
-          await EventModel.updateMany(
-            { lieu: adresse, ...NON_GEOCODE },
-            { latitude: coords.latitude, longitude: coords.longitude, statutGeocodage: 'ok' }
+          await executer(
+            `UPDATE evenements SET latitude = $2, longitude = $3, statut_geocodage = 'ok'
+              WHERE btrim(lieu) = $1 AND ${NON_GEOCODE}`,
+            [adresse, coords.latitude, coords.longitude]
           );
           geocodes++;
         } else {
-          await EventModel.updateMany({ lieu: adresse, ...NON_GEOCODE }, { statutGeocodage: 'echec' });
+          await executer(`UPDATE evenements SET statut_geocodage = 'echec' WHERE btrim(lieu) = $1 AND ${NON_GEOCODE}`, [adresse]);
           echecs++;
         }
       }
     }
 
-    const restants = await EventModel.countDocuments(NON_GEOCODE);
+    const [{ restants }] = await requete<{ restants: number }>(`SELECT count(*) AS restants FROM evenements WHERE ${NON_GEOCODE}`);
     // Toutes les adresses de `adressesDistinctes` ont été résolues (ok ou échec) ci-dessus : le nombre
     // d'adresses distinctes encore à traiter est simplement le total moins celles de ce lot.
     const adressesRestantes = Math.max(0, toutesAdressesDistinctes.length - adressesDistinctes.length);
@@ -374,19 +373,22 @@ eventsRouter.post('/geocoder', requireAdmin, async (_req, res) => {
  * l'est, l'autre reste en base — il doit toujours en rester un.
  */
 eventsRouter.delete('/:id', requireAdmin, async (req, res) => {
-  const cible = await EventModel.findById(req.params.id).lean();
+  const cible = await lireEvenement(req.params.id);
   if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
-  await EventModel.deleteMany({ ...filtreSerie(cible), dateClef: { $ne: cible.dateClef } });
-  await EventModel.findByIdAndDelete(cible._id);
+  const serie = filtreSerie(cible);
+  await executer(
+    `DELETE FROM evenements WHERE (${serie.condition} AND date_clef IS DISTINCT FROM $4) OR id = $5`,
+    [...serie.params, cible.dateClef, cible._id]
+  );
   await consigner(identiteDeRequete(req), 'suppression_evenement', cible.nom);
   res.json({ ok: true });
 });
 
 eventsRouter.get('/:id', async (req, res) => {
-  const item = await EventModel.findById(req.params.id).lean();
+  const item = await lireEvenement(req.params.id);
   if (!item) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
@@ -402,7 +404,10 @@ eventsRouter.post('/:id/statut', requireAdmin, async (req, res) => {
     res.status(400).json({ ok: false, message: 'Données invalides' });
     return;
   }
-  const updated = await EventModel.findByIdAndUpdate(req.params.id, { statut: parsed.data.statut }, { new: true });
+  const updated = await requeteUne<Evenement>('UPDATE evenements SET statut = $2 WHERE id = $1 RETURNING *', [
+    req.params.id,
+    parsed.data.statut,
+  ]);
   if (!updated) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
@@ -416,7 +421,15 @@ eventsRouter.post('/:id/statut', requireAdmin, async (req, res) => {
  * dateDeDebut/dateDeFin (seule dateClef diffère d'une ligne à l'autre pour un tel événement).
  */
 function filtreSerie(e: { nom: string; dateDeDebut?: Date | null; dateDeFin?: Date | null }) {
-  return { nom: e.nom, dateDeDebut: e.dateDeDebut ?? null, dateDeFin: e.dateDeFin ?? null };
+  return {
+    // Paramètres $1 à $3 ; IS NOT DISTINCT FROM fait correspondre NULL avec NULL (ce que « = » ne fait pas).
+    condition: 'nom = $1 AND date_de_debut IS NOT DISTINCT FROM $2 AND date_de_fin IS NOT DISTINCT FROM $3',
+    params: [e.nom, e.dateDeDebut ?? null, e.dateDeFin ?? null],
+  };
+}
+
+function lireEvenement(id: string, executant?: Executant): Promise<Evenement | null> {
+  return requeteUne<Evenement>('SELECT * FROM evenements WHERE id = $1', [id], executant);
 }
 
 /**
@@ -431,13 +444,21 @@ eventsRouter.post('/:id/validations', requireAdmin, async (req, res) => {
     res.status(400).json({ ok: false, message: 'Données invalides' });
     return;
   }
-  const cible = await EventModel.findById(req.params.id);
+  const cible = await lireEvenement(req.params.id);
   if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
-  await EventModel.updateMany(filtreSerie(cible), parsed.data);
-  const updated = await EventModel.findById(req.params.id);
+  const serie = filtreSerie(cible);
+  const { validationTechnique, validationPolitique } = parsed.data;
+  // COALESCE($n, colonne) : une validation non transmise garde sa valeur actuelle.
+  await executer(
+    `UPDATE evenements SET validation_technique = COALESCE($4, validation_technique),
+                           validation_politique = COALESCE($5, validation_politique)
+      WHERE ${serie.condition}`,
+    [...serie.params, validationTechnique ?? null, validationPolitique ?? null]
+  );
+  const updated = await lireEvenement(req.params.id);
   await consigner(identiteDeRequete(req), 'changement_validation', cible.nom, parsed.data);
   res.json({ ok: true, item: updated });
 });
@@ -466,7 +487,7 @@ function parseJourCivil(value: string): Date | null {
  * jour (dateClef), reporter la date recrée l'intégralité de la série sur les nouveaux jours : toutes
  * les lignes de l'ancienne série (voir filtreSerie) sont supprimées puis remplacées par une ligne par
  * jour de la nouvelle plage, en conservant tous les autres champs (lieu, quartier, validations,
- * etc.) tels qu'ils étaient. Les identifiants Mongo des nouvelles lignes sont donc différents de
+ * etc.) tels qu'ils étaient. Les identifiants des nouvelles lignes sont donc différents de ceux de
  * l'ancienne série.
  */
 eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
@@ -477,7 +498,7 @@ eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
     return;
   }
 
-  const cible = await EventModel.findById(req.params.id).lean();
+  const cible = await lireEvenement(req.params.id);
   if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
@@ -495,7 +516,7 @@ eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
     nouveauDebut.getMonth() === nouveauFin.getMonth() &&
     nouveauDebut.getDate() === nouveauFin.getDate();
 
-  const { _id, dateClef, dateDeDebut, dateDeFin, createdAt, updatedAt, __v, ...gabarit } = cible as Record<string, unknown>;
+  const { _id, dateClef, dateDeDebut, dateDeFin, createdAt, updatedAt, ...gabarit } = cible;
 
   const nouvellesLignes: Record<string, unknown>[] = [];
   for (
@@ -511,8 +532,12 @@ eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
     });
   }
 
-  await EventModel.deleteMany(filtreSerie(cible));
-  const crees = await EventModel.insertMany(nouvellesLignes);
+  // Suppression de l'ancienne série et création de la nouvelle vont ensemble : jamais l'une sans l'autre.
+  const serie = filtreSerie(cible);
+  const crees = await transaction(async (client) => {
+    await executer(`DELETE FROM evenements WHERE ${serie.condition}`, serie.params, client);
+    return inserer<Evenement>('evenements', nouvellesLignes, client);
+  });
   await consigner(identiteDeRequete(req), 'report_date_evenement', cible.nom, {
     ancien: { dateDeDebut: cible.dateDeDebut, dateDeFin: cible.dateDeFin },
     nouveau: { dateDeDebut: nouveauDebut, dateDeFin: memeJour ? null : nouveauFin },
@@ -526,18 +551,19 @@ eventsRouter.post('/:id/dates', requireAdmin, async (req, res) => {
  */
 eventsRouter.post('/:id/valider', requireAdmin, async (req, res) => {
   const viaPastilleDateClef = z.boolean().optional().parse(req.body?.viaPastilleDateClef);
-  const cible = await EventModel.findById(req.params.id);
+  const cible = await lireEvenement(req.params.id);
   if (!cible) {
     res.status(404).json({ ok: false, message: 'Événement introuvable' });
     return;
   }
-  await EventModel.updateMany(filtreSerie(cible), {
-    statut: 'Validée',
-    validationTechnique: true,
-    validationPolitique: true,
-    validParDateClef: viaPastilleDateClef ?? false,
-  });
-  const updated = await EventModel.findById(req.params.id);
+  const serie = filtreSerie(cible);
+  await executer(
+    `UPDATE evenements SET statut = 'Validée', validation_technique = true, validation_politique = true,
+                           valid_par_date_clef = $4
+      WHERE ${serie.condition}`,
+    [...serie.params, viaPastilleDateClef ?? false]
+  );
+  const updated = await lireEvenement(req.params.id);
   await consigner(
     identiteDeRequete(req),
     viaPastilleDateClef ? 'marquage_date_clef' : 'validation_evenement',

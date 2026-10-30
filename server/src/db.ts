@@ -42,6 +42,12 @@ export async function requete<T = Ligne>(texte: string, params: unknown[] = [], 
   return resultat.rows.map(enObjet) as T[];
 }
 
+/** Exécute une requête sans lignes à renvoyer (UPDATE, DELETE…) et renvoie le nombre de lignes touchées. */
+export async function executer(texte: string, params: unknown[] = [], executant: Executant = pool): Promise<number> {
+  const resultat = await executant.query(texte, params);
+  return resultat.rowCount ?? 0;
+}
+
 /** Variante de `requete` pour une seule ligne attendue (ou aucune). */
 export async function requeteUne<T = Ligne>(texte: string, params: unknown[] = [], executant: Executant = pool): Promise<T | null> {
   const lignes = await requete<T>(texte, params, executant);
