@@ -1,9 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { connectDb } from './db.js';
-import { EventModel } from './models/Event.js';
-import { UserModel } from './models/User.js';
+import { appliquerMigrations, clauseSet, executer, insererUn, pool, requeteUne, transaction } from './db.js';
 import { parseEventsCsv, parseUsersCsv } from './lib/csv.js';
 import { genererHash, genererSel } from './lib/password.js';
 
@@ -22,12 +20,29 @@ async function seedEvents(): Promise<void> {
 
   let created = 0;
   let updated = 0;
-  for (const row of rows) {
-    const filter = row.eventId ? { eventId: row.eventId } : { nom: row.nom, dateClef: row.dateClef };
-    const result = await EventModel.updateOne(filter, { $set: row }, { upsert: true });
-    if (result.upsertedCount > 0) created++;
-    else updated++;
-  }
+  // Mise à jour si l'événement existe déjà (même eventId, sinon même nom et même jour), création sinon.
+  await transaction(async (client) => {
+    for (const row of rows) {
+      const { texte, params } = clauseSet('evenements', { ...row }, 1);
+      const identite = row.eventId
+        ? { condition: `event_id = $${params.length + 1}`, params: [row.eventId] }
+        : {
+            condition: `nom = $${params.length + 1} AND date_clef IS NOT DISTINCT FROM $${params.length + 2}`,
+            params: [row.nom, row.dateClef],
+          };
+      const modifies = await executer(
+        `UPDATE evenements SET ${texte} WHERE ${identite.condition}`,
+        [...params, ...identite.params],
+        client
+      );
+      if (modifies > 0) {
+        updated++;
+      } else {
+        await insererUn('evenements', row, client);
+        created++;
+      }
+    }
+  });
   console.log(`[seed] Événements : ${created} créés, ${updated} mis à jour (${rows.length} lignes lues)`);
 }
 
@@ -46,22 +61,17 @@ async function seedUsers(): Promise<void> {
   const motsDePasseGeneres: Array<{ email: string; motDePasse: string }> = [];
 
   for (const row of rows) {
-    const existant = await UserModel.findOne({ email: row.email });
+    const existant = await requeteUne<{ _id: string }>('SELECT id FROM utilisateurs WHERE email = $1', [row.email]);
     if (existant) {
-      existant.nom = row.nom;
-      existant.role = row.role as 'Administrateur' | 'Consultant';
-      existant.statut = row.statut;
-      if (row.motDePasseInitial) {
-        const { hash, sel } = await genererHash(row.motDePasseInitial);
-        existant.hash = hash;
-        existant.sel = sel;
-      }
-      await existant.save();
+      const champs: Record<string, unknown> = { nom: row.nom, role: row.role, statut: row.statut };
+      if (row.motDePasseInitial) Object.assign(champs, await genererHash(row.motDePasseInitial));
+      const { texte, params } = clauseSet('utilisateurs', champs, 2);
+      await executer(`UPDATE utilisateurs SET ${texte} WHERE id = $1`, [existant._id, ...params]);
       updated++;
     } else {
       const motDePasse = row.motDePasseInitial || genererSel().slice(0, 12);
       const { hash, sel } = await genererHash(motDePasse);
-      await UserModel.create({
+      await insererUn('utilisateurs', {
         nom: row.nom,
         email: row.email,
         role: row.role,
@@ -82,11 +92,11 @@ async function seedUsers(): Promise<void> {
 }
 
 async function main() {
-  await connectDb();
+  await appliquerMigrations();
   await seedEvents();
   await seedUsers();
+  await pool.end();
   console.log('[seed] Terminé.');
-  process.exit(0);
 }
 
 main().catch((err) => {

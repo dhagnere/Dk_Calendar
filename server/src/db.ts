@@ -1,5 +1,4 @@
 import pg from 'pg';
-import mongoose from 'mongoose';
 import path from 'node:path';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -224,11 +223,6 @@ let connected = false;
 export async function connectDb(): Promise<void> {
   if (connected) return;
   await appliquerMigrations();
-  console.log(`[db] Connecté à PostgreSQL (${config.databaseUrl.replace(/\/\/.*@/, '//***@')})`);
-
-  // Transitoire : les routes pas encore réécrites utilisent toujours MongoDB.
-  mongoose.set('strictQuery', true);
-  await mongoose.connect(config.mongoUri);
-  console.log(`[db] Connecté à MongoDB (${config.mongoUri.replace(/\/\/.*@/, '//***@')})`);
   connected = true;
+  console.log(`[db] Connecté à PostgreSQL (${config.databaseUrl.replace(/\/\/.*@/, '//***@')})`);
 }

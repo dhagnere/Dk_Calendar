@@ -12,7 +12,7 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: MONGODB_URI
+      - key: DATABASE_URL
         sync: false
       - key: CLIENT_ORIGIN
         sync: false

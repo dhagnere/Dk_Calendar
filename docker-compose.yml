@@ -1,25 +1,35 @@
 services:
-  mongo:
-    image: mongo:7
+  postgres:
+    image: postgres:16
     restart: unless-stopped
+    environment:
+      POSTGRES_DB: dk_calendar
+      POSTGRES_USER: dk_calendar
+      POSTGRES_PASSWORD: dk_calendar
     ports:
-      - '27017:27017'
+      - '5432:5432'
     volumes:
-      - mongo_data:/data/db
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dk_calendar -d dk_calendar']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   app:
     build: .
     restart: unless-stopped
     depends_on:
-      - mongo
+      postgres:
+        condition: service_healthy
     ports:
       - '4000:4000'
     environment:
-      MONGODB_URI: mongodb://mongo:27017/dk_calendar
+      DATABASE_URL: postgres://dk_calendar:dk_calendar@postgres:5432/dk_calendar
       JWT_SECRET: ${JWT_SECRET:-changez-moi-en-production}
       CLIENT_ORIGIN: http://localhost:4000
       PORT: 4000
       NODE_ENV: production
 
 volumes:
-  mongo_data:
+  pg_data:
