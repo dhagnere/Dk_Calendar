@@ -1,5 +1,6 @@
 import { config } from '../config.js';
-import { EventModel } from '../models/Event.js';
+import { requete } from '../db.js';
+import type { Evenement } from '../modeles.js';
 import { stringifyEventsCsv } from './csv.js';
 
 const API_BASE = 'https://api.github.com';
@@ -64,7 +65,7 @@ export async function synchroniserEvenementsVersGithub(): Promise<{ ok: boolean;
   }
 
   try {
-    const events = await EventModel.find({}).sort({ nom: 1 }).lean();
+    const events = await requete<Evenement>('SELECT * FROM evenements ORDER BY nom');
     const csv = stringifyEventsCsv(events);
 
     const chemin = config.github.cheminEvenements;

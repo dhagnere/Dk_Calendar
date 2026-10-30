@@ -1,6 +1,6 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from '../config.js';
-import { UserModel } from '../models/User.js';
+import { requete } from '../db.js';
 
 let transporter: Transporter | null | undefined;
 
@@ -57,8 +57,10 @@ export async function envoyerEmail(options: EmailOptions): Promise<boolean> {
 /** Emails des administrateurs à notifier : adresse dédiée si configurée, sinon tous les admins actifs. */
 async function destinatairesAdministrateurs(): Promise<string[]> {
   if (config.adminNotificationEmail) return [config.adminNotificationEmail];
-  const admins = await UserModel.find({ role: 'Administrateur', statut: 'Actif' }, { email: 1 }).lean();
-  return admins.map((a) => a.email).filter((email): email is string => !!email);
+  const admins = await requete<{ email: string }>(
+    "SELECT email FROM utilisateurs WHERE role = 'Administrateur' AND statut = 'Actif'"
+  );
+  return admins.map((a) => a.email).filter((email) => !!email);
 }
 
 function echapperHtml(value: string): string {

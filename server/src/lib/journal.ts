@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import { JournalActionModel } from '../models/JournalAction.js';
+import { insererUn } from '../db.js';
 
 export interface IdentiteJournal {
   userId: string | null;
@@ -23,7 +23,7 @@ export async function consigner(
   details?: unknown
 ): Promise<void> {
   try {
-    await JournalActionModel.create({
+    await insererUn('journal_actions', {
       utilisateurId: identite.userId,
       utilisateurNom: identite.nom,
       utilisateurEmail: identite.email,
